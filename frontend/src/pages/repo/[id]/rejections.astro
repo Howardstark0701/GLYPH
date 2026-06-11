@@ -1,0 +1,810 @@
+---
+// GLYPH OS — Rejection Vault
+// src/pages/repo/[id]/rejections.astro
+
+const { id } = Astro.params;
+
+// Decode repo slug from id param
+let repoOwner = 'unknown';
+let repoName  = 'unknown';
+try {
+  const decoded = decodeURIComponent(id ?? '');
+  const match   = decoded.match(/github\.com\/([^\/]+)\/([^\/\s]+)/);
+  if (match) {
+    repoOwner = match[1];
+    repoName  = match[2].replace(/\.git$/, '');
+  } else {
+    const parts = decoded.split('/').filter(Boolean);
+    if (parts.length >= 2) { repoOwner = parts[0]; repoName = parts[1]; }
+    else if (parts.length === 1) { repoName = parts[0]; }
+  }
+} catch (_) {}
+
+const repoSlug = `${repoOwner}/${repoName}`;
+const repoId   = `${repoOwner}-${repoName}`.toLowerCase();
+
+// ── Static rejection data (populated from GET /repo/:id/rejections in prod) ──
+interface Rejection {
+  index:       number;
+  title:       string;
+  contributor: string;
+  timestamp:   string;
+  reason?:     string;   // only on "critical" cards
+}
+
+const rejections: Rejection[] = [
+  { index: 1,  title: 'ASYNC_BATCH_PROCESSOR',       contributor: 'dev_marcus',       timestamp: '2024-02-14T09:12:44Z' },
+  { index: 2,  title: 'MONOLITH_REWRITE_ATTEMPT',    contributor: 'arch_priya',       timestamp: '2024-03-01T14:38:02Z', reason: 'DEBATE_UNRESOLVED' },
+  { index: 3,  title: 'GRAPHQL_MIGRATION_LAYER',      contributor: 'dev_soren',        timestamp: '2024-03-18T11:05:19Z' },
+  { index: 4,  title: 'REDIS_CACHE_INTEGRATION',     contributor: 'infra_tolly',      timestamp: '2024-04-02T16:22:55Z' },
+  { index: 5,  title: 'WEBSOCKET_REALTIME_FEED',     contributor: 'dev_marcus',       timestamp: '2024-04-11T08:47:31Z', reason: 'INSUFFICIENT_COMMIT_EVIDENCE' },
+  { index: 6,  title: 'OAUTH_PROVIDER_SWITCH',       contributor: 'sec_ananya',       timestamp: '2024-04-29T13:14:08Z' },
+  { index: 7,  title: 'RATE_LIMIT_BYPASS_MODULE',    contributor: 'dev_soren',        timestamp: '2024-05-07T10:33:22Z' },
+  { index: 8,  title: 'MULTI_TENANT_SCHEMA',         contributor: 'arch_priya',       timestamp: '2024-05-22T17:01:47Z', reason: 'DEBATE_UNRESOLVED' },
+  { index: 9,  title: 'STREAMING_DIFF_ENGINE',       contributor: 'dev_marcus',       timestamp: '2024-06-03T09:55:13Z' },
+  { index: 10, title: 'CONTRIBUTOR_SCORING_V1',      contributor: 'analytics_reed',   timestamp: '2024-06-19T15:28:39Z' },
+  { index: 11, title: 'FULL_TEXT_SEARCH_INDEX',      contributor: 'infra_tolly',      timestamp: '2024-07-08T12:09:04Z', reason: 'INSUFFICIENT_COMMIT_EVIDENCE' },
+  { index: 12, title: 'WEBHOOK_EVENT_PIPELINE',      contributor: 'dev_soren',        timestamp: '2024-07-24T11:42:17Z' },
+];
+
+// Pre-compute padded IDs: repo_id-001, repo_id-002 ...
+const padIdx = (n: number) => String(n).padStart(3, '0');
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GLYPH — Rejection Vault — {repoSlug}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset ────────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+      transition: none !important;
+      outline: none;
+    }
+    html, body {
+      margin: 0; padding: 0;
+      background: #131313;
+      color: #e5e2e1;
+      font-family: 'Karla', sans-serif;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    /* ── Type helpers ─────────────────────────────────────── */
+    .data-sm    { font-family: 'JetBrains Mono', monospace; font-size: 0.6875rem; line-height: 1rem; }
+    .label-caps { font-family: 'JetBrains Mono', monospace; font-size: 0.6875rem; letter-spacing: 0.1em; text-transform: uppercase; line-height: 1rem; }
+
+    /* ══════════════════════════════════════════════════════
+       TOP NAVBAR — 44px fixed
+    ══════════════════════════════════════════════════════ */
+    #navbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 44px;
+      background: #131313;
+      border-bottom: 1px solid #262626;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 18px;
+      z-index: 200;
+    }
+
+    /* Brand */
+    #nav-brand {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 2px;
+    }
+    #nav-brand .wordmark {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 1rem;
+      color: #ffb4a8;
+      line-height: 1;
+      letter-spacing: -0.01em;
+      text-decoration: none;
+    }
+    #nav-brand .version {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      color: #a1a1a1;
+      letter-spacing: 0.06em;
+    }
+
+    /* Right icons */
+    #nav-icons {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .nav-icon-btn {
+      width: 28px;
+      height: 28px;
+      background: transparent;
+      border: 1px solid #262626;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #a1a1a1;
+      padding: 0;
+    }
+    .nav-icon-btn:hover { border-color: #cc0000; color: #cc0000; }
+
+    /* ══════════════════════════════════════════════════════
+       LAYOUT — sidebar + main
+    ══════════════════════════════════════════════════════ */
+    #layout {
+      position: fixed;
+      top: 44px; left: 0; right: 0; bottom: 0;
+      display: flex;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       LEFT SIDEBAR — 160px
+    ══════════════════════════════════════════════════════ */
+    #sidebar {
+      width: 160px;
+      flex-shrink: 0;
+      background: #131313;
+      border-right: 1px solid #262626;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-nav {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding-top: 6px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 9px 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #a1a1a1;
+      cursor: pointer;
+      user-select: none;
+      border: none;
+      border-left: 2px solid transparent;
+      background: transparent;
+      width: 100%;
+      text-align: left;
+      text-decoration: none;
+    }
+    .nav-item:hover:not(.active) { color: #e5e2e1; background: #1a1a1a; }
+    .nav-item.active {
+      border-left-color: #cc0000;
+      color: #ffffff;
+      background: transparent;
+    }
+    .nav-item svg { flex-shrink: 0; }
+
+    /* Logout sits at bottom */
+    .sidebar-spacer { flex: 1; }
+    .nav-item-logout {
+      border-top: 1px solid #262626;
+      color: #5e3f3a;
+    }
+    .nav-item-logout:hover { color: #cc0000; background: transparent; }
+
+    /* ══════════════════════════════════════════════════════
+       MAIN AREA
+    ══════════════════════════════════════════════════════ */
+    #main-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    /* ── Page header ──────────────────────────────────────── */
+    #page-header {
+      padding: 18px 24px 16px;
+      border-bottom: 1px solid #262626;
+      flex-shrink: 0;
+    }
+
+    .breadcrumb-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .breadcrumb-row .bc-vault {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #cc0000;
+    }
+    .breadcrumb-row .bc-sep {
+      color: #262626;
+      font-size: 0.75rem;
+    }
+    .breadcrumb-row .bc-status {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #a1a1a1;
+    }
+
+    .page-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 2rem;
+      color: #ffb4a8;
+      line-height: 1;
+      margin: 0 0 10px;
+    }
+    .page-desc {
+      font-family: 'Karla', sans-serif;
+      font-size: 0.875rem;
+      color: #a1a1a1;
+      line-height: 1.5;
+      max-width: 640px;
+      margin: 0;
+    }
+
+    /* ── Scrollable content ───────────────────────────────── */
+    #content-scroll {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    #content-scroll::-webkit-scrollbar { width: 3px; }
+    #content-scroll::-webkit-scrollbar-track { background: #131313; }
+    #content-scroll::-webkit-scrollbar-thumb { background: #262626; }
+
+    /* ── Card grid ────────────────────────────────────────── */
+    #card-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1px;
+      padding: 20px 24px;
+      background: #262626; /* gap color from bg bleed */
+    }
+
+    /* Individual rejection card */
+    .rejection-card {
+      background: #0e0e0e;
+      border: 1px solid #262626;
+      padding: 12px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      position: relative;
+    }
+
+    /* Top meta row */
+    .card-meta-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .card-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      color: #a1a1a1;
+      letter-spacing: 0.04em;
+    }
+    .rejected-chip {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.55rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #cc0000;
+      border: 1px solid #cc0000;
+      padding: 2px 6px;
+      background: transparent;
+      line-height: 1;
+    }
+
+    /* Title */
+    .card-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 600;
+      font-size: 0.8rem;
+      color: #e5e2e1;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      margin: 0 0 8px;
+      line-height: 1.2;
+    }
+
+    /* Rejection reason row (critical cards only) */
+    .card-reason-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #1e1e1e;
+    }
+    .card-reason-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.55rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #a1a1a1;
+      flex-shrink: 0;
+    }
+    .card-reason-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.55rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #cc0000;
+      text-align: right;
+    }
+
+    /* Divider above metadata */
+    .card-divider {
+      width: 100%;
+      height: 1px;
+      background: #262626;
+      margin-bottom: 8px;
+    }
+
+    /* Metadata rows */
+    .card-data-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 5px;
+    }
+    .card-data-row:last-child { margin-bottom: 0; }
+    .card-data-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.55rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #a1a1a1;
+    }
+    .card-data-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      color: #e5e2e1;
+      text-align: right;
+    }
+    .card-data-val.contributor { color: #a1a1a1; }
+
+    /* ══════════════════════════════════════════════════════
+       BOTTOM TERMINAL PANEL
+    ══════════════════════════════════════════════════════ */
+    #terminal-panel {
+      flex-shrink: 0;
+      background: #0e0e0e;
+      border-top: 1px solid #262626;
+      height: 160px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    #terminal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 14px;
+      border-bottom: 1px solid #262626;
+      flex-shrink: 0;
+      background: #131313;
+    }
+
+    .terminal-header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .terminal-header-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #a1a1a1;
+    }
+    .live-feed-chip {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.55rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #cc0000;
+      border: 1px solid #cc0000;
+      padding: 1px 6px;
+      background: transparent;
+    }
+
+    .terminal-header-right {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      color: #a1a1a1;
+      letter-spacing: 0.06em;
+    }
+
+    #terminal-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+    #terminal-body::-webkit-scrollbar { width: 3px; }
+    #terminal-body::-webkit-scrollbar-track { background: #0e0e0e; }
+    #terminal-body::-webkit-scrollbar-thumb { background: #262626; }
+
+    .t-line {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      line-height: 1.65;
+      color: #a1a1a1;
+      white-space: nowrap;
+      letter-spacing: 0.04em;
+    }
+    .t-ts    { color: #5e3f3a; }
+    .t-key   { color: #a1a1a1; }
+    .t-ok    { color: #a1a1a1; }
+    .t-red   { color: #cc0000; font-weight: 700; }
+    .t-entry { color: #e5e2e1; }
+  </style>
+</head>
+<body>
+
+  <!-- ════════════════════════════════════════════════════════
+       TOP NAVBAR
+  ═════════════════════════════════════════════════════════ -->
+  <nav id="navbar" aria-label="System navigation">
+    <div id="nav-brand">
+      <a href="/" class="wordmark" aria-label="Return to GLYPH home">GLYPH_OS</a>
+      <span class="version">v4.0.2-STABLE</span>
+    </div>
+
+    <div id="nav-icons" aria-label="System actions">
+      <!-- Clock -->
+      <button class="nav-icon-btn" aria-label="System clock" title="Clock">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+          <circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1"/>
+          <line x1="6.5" y1="3" x2="6.5" y2="6.5" stroke="currentColor" stroke-width="1"/>
+          <line x1="6.5" y1="6.5" x2="9"   y2="8"   stroke="currentColor" stroke-width="1"/>
+        </svg>
+      </button>
+      <!-- Network -->
+      <button class="nav-icon-btn" aria-label="Network status" title="Network">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+          <rect x="5.5" y="0.5" width="2" height="2" fill="currentColor"/>
+          <rect x="0.5" y="5.5" width="2" height="2" fill="currentColor"/>
+          <rect x="10.5" y="5.5" width="2" height="2" fill="currentColor"/>
+          <rect x="5.5" y="10.5" width="2" height="2" fill="currentColor"/>
+          <line x1="6.5" y1="2.5"  x2="6.5" y2="5.5"  stroke="currentColor" stroke-width="1"/>
+          <line x1="2.5" y1="6.5"  x2="5.5" y2="6.5"  stroke="currentColor" stroke-width="1"/>
+          <line x1="7.5" y1="6.5"  x2="10.5" y2="6.5" stroke="currentColor" stroke-width="1"/>
+          <line x1="6.5" y1="7.5"  x2="6.5" y2="10.5" stroke="currentColor" stroke-width="1"/>
+        </svg>
+      </button>
+      <!-- Settings -->
+      <button class="nav-icon-btn" aria-label="Settings" title="Settings">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+          <circle cx="6.5" cy="6.5" r="2" stroke="currentColor" stroke-width="1"/>
+          <path d="M6.5 1v1.5M6.5 10.5V12M1 6.5h1.5M10.5 6.5H12M2.6 2.6l1.1 1.1M9.3 9.3l1.1 1.1M2.6 10.4l1.1-1.1M9.3 3.7l1.1-1.1" stroke="currentColor" stroke-width="1"/>
+        </svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ════════════════════════════════════════════════════════
+       LAYOUT
+  ═════════════════════════════════════════════════════════ -->
+  <div id="layout">
+
+    <!-- ── LEFT SIDEBAR ─────────────────────────────────── -->
+    <aside id="sidebar" aria-label="Navigation sidebar">
+      <nav class="sidebar-nav" aria-label="Vault sections">
+
+        <a href={`/repo/${id}`} class="nav-item" aria-label="Terminal — analysis dashboard">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <rect x="0" y="0" width="10" height="10" stroke="currentColor" stroke-width="1" fill="none"/>
+            <polyline points="2,4 4,5 2,6" stroke="currentColor" stroke-width="1" fill="none"/>
+            <line x1="5" y1="7" x2="8" y2="7" stroke="currentColor" stroke-width="1"/>
+          </svg>
+          TERMINAL
+        </a>
+
+        <a href={`/repo/${id}`} class="nav-item" aria-label="Uplink — analysis dashboard">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <line x1="5" y1="1" x2="5" y2="7" stroke="currentColor" stroke-width="1"/>
+            <polyline points="2,4 5,1 8,4" stroke="currentColor" stroke-width="1" fill="none"/>
+            <line x1="1" y1="9" x2="9" y2="9" stroke="currentColor" stroke-width="1"/>
+          </svg>
+          UPLINK
+        </a>
+
+        <a href="#" class="nav-item active" aria-current="page" aria-label="Archive — current page">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <rect x="0" y="3" width="10" height="7" stroke="currentColor" stroke-width="1" fill="none"/>
+            <rect x="0" y="0" width="10" height="3" stroke="currentColor" stroke-width="1" fill="none"/>
+            <line x1="3.5" y1="6" x2="6.5" y2="6" stroke="currentColor" stroke-width="1"/>
+          </svg>
+          ARCHIVE
+        </a>
+
+        <a href="#" class="nav-item" aria-label="Sensors">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <circle cx="5" cy="5" r="1.5" stroke="currentColor" stroke-width="1"/>
+            <path d="M2.5 2.5 C1 3.5 1 6.5 2.5 7.5" stroke="currentColor" stroke-width="1" fill="none"/>
+            <path d="M7.5 2.5 C9 3.5 9 6.5 7.5 7.5" stroke="currentColor" stroke-width="1" fill="none"/>
+          </svg>
+          SENSORS
+        </a>
+
+        <a href="#" class="nav-item" aria-label="Decrypt">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <rect x="2" y="4" width="6" height="5" stroke="currentColor" stroke-width="1" fill="none"/>
+            <path d="M3,4 L3,3 C3,1.3 7,1.3 7,3 L7,4" stroke="currentColor" stroke-width="1" fill="none"/>
+          </svg>
+          DECRYPT
+        </a>
+
+        <a href="#" class="nav-item" aria-label="System settings">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <circle cx="5" cy="5" r="2" stroke="currentColor" stroke-width="1"/>
+            <path d="M5 1v1M5 8v1M1 5h1M8 5h1M2.1 2.1l.7.7M7.2 7.2l.7.7M2.1 7.9l.7-.7M7.2 2.8l.7-.7" stroke="currentColor" stroke-width="1"/>
+          </svg>
+          SYSTEM
+        </a>
+
+        <span class="sidebar-spacer"></span>
+
+        <a href="/" class="nav-item nav-item-logout" aria-label="Logout — return to home">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <path d="M4 2H1V9H4" stroke="currentColor" stroke-width="1" fill="none"/>
+            <line x1="5" y1="5" x2="10" y2="5" stroke="currentColor" stroke-width="1"/>
+            <polyline points="8,3 10,5 8,7" stroke="currentColor" stroke-width="1" fill="none"/>
+          </svg>
+          LOGOUT
+        </a>
+
+      </nav>
+    </aside>
+
+    <!-- ── MAIN AREA ─────────────────────────────────────── -->
+    <div id="main-area">
+
+      <!-- Page header -->
+      <header id="page-header">
+        <div class="breadcrumb-row" aria-label="Page location">
+          <span class="bc-vault">REJECTION_VAULT</span>
+          <span class="bc-sep" aria-hidden="true">|</span>
+          <span class="bc-status">STATUS: SECURE_CONTAINMENT</span>
+        </div>
+        <h1 class="page-title">INDEX OF FAILED PROPOSITIONS</h1>
+        <p class="page-desc">
+          The following entries have been analyzed, extracted, and subsequently terminated
+          from active development history. No further modification is permitted.
+          Historical record only.
+        </p>
+      </header>
+
+      <!-- Scrollable content -->
+      <div id="content-scroll">
+
+        <!-- Rejection card grid -->
+        <div id="card-grid" role="list" aria-label="Rejected propositions">
+
+          {rejections.map((r) => (
+            <article class="rejection-card" role="listitem" aria-label={`Rejection: ${r.title}`}>
+
+              <!-- Top meta row -->
+              <div class="card-meta-row">
+                <span class="card-id" aria-label={`Entry ID: ${repoId}-${padIdx(r.index)}`}>
+                  ID: {repoId}-{padIdx(r.index)}
+                </span>
+                <span class="rejected-chip" role="status" aria-label="Status: Rejected">REJECTED</span>
+              </div>
+
+              <!-- Title -->
+              <h2 class="card-title">{r.title}</h2>
+
+              <!-- Rejection reason (critical cards only) -->
+              {r.reason && (
+                <div class="card-reason-row" aria-label={`Rejection reason: ${r.reason}`}>
+                  <span class="card-reason-label">REJECTION_REASON:</span>
+                  <span class="card-reason-val">{r.reason}</span>
+                </div>
+              )}
+
+              <!-- Divider -->
+              <div class="card-divider" aria-hidden="true"></div>
+
+              <!-- Metadata rows -->
+              <div class="card-data-row" aria-label={`Contributor: @${r.contributor}`}>
+                <span class="card-data-label">CONTRIBUTOR:</span>
+                <span class="card-data-val contributor">@{r.contributor}</span>
+              </div>
+
+              <div class="card-data-row" aria-label={`Timestamp: ${r.timestamp}`}>
+                <span class="card-data-label">TIMESTAMP:</span>
+                <span class="card-data-val">{r.timestamp.replace('T', ' ').replace('Z', '')}</span>
+              </div>
+
+            </article>
+          ))}
+
+        </div><!-- /card-grid -->
+
+      </div><!-- /content-scroll -->
+
+      <!-- Bottom terminal panel -->
+      <footer id="terminal-panel" aria-label="Vault access logs">
+        <div id="terminal-header">
+          <div class="terminal-header-left">
+            <span class="terminal-header-label">VAULT_ACCESS_LOGS</span>
+            <span class="live-feed-chip" role="status">LIVE_FEED</span>
+          </div>
+          <div class="terminal-header-right">
+            ENTRIES: <span id="entry-count">{rejections.length}</span>
+            &nbsp;&nbsp;
+            MEMORY: <span id="memory-pct">0</span>%
+          </div>
+        </div>
+
+        <div id="terminal-body" role="log" aria-label="Vault access log entries" aria-live="polite">
+          <!-- Seed lines -->
+          <div class="t-line"><span class="t-ts">[14:21:28]</span> <span class="t-key">DATABASE_CONNECT:</span> <span class="t-ok">SUCCESS</span></div>
+          <div class="t-line"><span class="t-ts">[14:21:32]</span> <span class="t-key">SCAN_INTERVAL:</span> <span class="t-ok">0.082ms</span></div>
+          <div class="t-line"><span class="t-ts">[14:21:48]</span> <span class="t-key">LOG_FLUSH:</span> <span class="t-ok">COMPLETED</span></div>
+          <div class="t-line"><span class="t-ts">[14:21:55]</span> <span class="t-key">UNAUTHORIZED_ATTEMPT:</span> <span class="t-ok">@unknown_probe</span> (<span class="t-red">REFUSED</span>)</div>
+          <div class="t-line"><span class="t-ts">[14:22:01]</span> <span class="t-key">REJECTION_ARCHIVE:</span> <span class="t-entry">ENTRY_{repoId}-001</span> (<span class="t-red">LOCKED</span>)</div>
+        </div>
+      </footer>
+
+    </div><!-- /main-area -->
+  </div><!-- /layout -->
+
+  <!-- ════════════════════════════════════════════════════════
+       SCRIPTS
+  ═════════════════════════════════════════════════════════ -->
+  <script define:vars={{ repoId, rejectionCount: rejections.length }}>
+    const API_BASE = (window as any).__GLYPH_API__ ?? (import.meta as any).env?.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+    (function initMemory() {
+      const el = document.getElementById('memory-pct');
+      if (!el) return;
+      let mem = 12 + Math.round(rejectionCount * 0.4);
+      el.textContent = String(Math.min(mem, 99));
+    })();
+
+    // ── Fetch real rejections and hydrate card grid ────────
+    (function hydrateRejections() {
+      const pathParts = window.location.pathname.split('/').filter(Boolean);
+      // URL pattern: /repo/:id/rejections  → jobId is second segment
+      const jobId = pathParts[1] ?? '';
+      const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRe.test(jobId)) return; // static seed data is fine for slug-based URLs
+
+      fetch(`${API_BASE}/api/repo/${jobId}/rejections`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!data?.rejections?.length) return;
+          const grid = document.getElementById('card-grid');
+          if (!grid) return;
+
+          // Replace grid contents with real data
+          grid.innerHTML = '';
+          data.rejections.forEach((r: any, idx: number) => {
+            const padIdx = String(idx + 1).padStart(3, '0');
+            const cardId = `${repoId}-${padIdx}`;
+            const title  = (r.title ?? 'UNKNOWN').toUpperCase().replace(/\s+/g, '_');
+            const contrib = Array.isArray(r.contributors) ? r.contributors[0] ?? 'unknown' : 'unknown';
+            const ts = r.timestamp ?? '';
+
+            const reasonRow = r.reasoning
+              ? `<div class="card-reason-row">
+                   <span class="card-reason-label">REJECTION_REASON:</span>
+                   <span class="card-reason-val">${r.reasoning.toUpperCase().split(' ').slice(0,3).join('_')}</span>
+                 </div>`
+              : '';
+
+            const card = document.createElement('article');
+            card.className = 'rejection-card';
+            card.setAttribute('role', 'listitem');
+            card.innerHTML = `
+              <div class="card-meta-row">
+                <span class="card-id">ID: ${cardId}</span>
+                <span class="rejected-chip">REJECTED</span>
+              </div>
+              <h2 class="card-title">${title}</h2>
+              ${reasonRow}
+              <div class="card-divider"></div>
+              <div class="card-data-row">
+                <span class="card-data-label">CONTRIBUTOR:</span>
+                <span class="card-data-val contributor">@${contrib}</span>
+              </div>
+              <div class="card-data-row">
+                <span class="card-data-label">TIMESTAMP:</span>
+                <span class="card-data-val">${ts.replace('T',' ').replace('Z','')}</span>
+              </div>`;
+            grid.appendChild(card);
+          });
+
+          // Update entry count
+          const ec = document.getElementById('entry-count');
+          if (ec) ec.textContent = String(data.total ?? data.rejections.length);
+        })
+        .catch(() => { /* keep static seed data on failure */ });
+    })();
+
+    // ── Live vault access log ─────────────────────────────
+    (function initTerminal() {
+      const body = document.getElementById('terminal-body');
+      if (!body) return;
+
+      const probes: string[] = ['@unknown_probe', '@crawler_77', '@anon_agent', '@ext_scraper'];
+      const locked: string[] = [];
+      for (let i = 1; i <= rejectionCount; i++) {
+        locked.push(`${repoId}-${String(i).padStart(3, '0')}`);
+      }
+
+      let lockIdx = 0, probeIdx = 0;
+
+      function nowTs(): string {
+        const d = new Date();
+        const h = String(d.getHours()).padStart(2, '0');
+        const m = String(d.getMinutes()).padStart(2, '0');
+        const s = String(d.getSeconds()).padStart(2, '0');
+        return `[${h}:${m}:${s}]`;
+      }
+
+      const events: (() => string)[] = [
+        () => `<span class="t-ts">${nowTs()}</span> <span class="t-key">SCAN_INTERVAL:</span> <span class="t-ok">${(Math.random() * 0.2).toFixed(3)}ms</span>`,
+        () => `<span class="t-ts">${nowTs()}</span> <span class="t-key">INTEGRITY_CHECK:</span> <span class="t-ok">PASS</span>`,
+        () => `<span class="t-ts">${nowTs()}</span> <span class="t-key">UNAUTHORIZED_ATTEMPT:</span> <span class="t-ok">${probes[probeIdx++ % probes.length]}</span> (<span class="t-red">REFUSED</span>)`,
+        () => `<span class="t-ts">${nowTs()}</span> <span class="t-key">REJECTION_ARCHIVE:</span> <span class="t-entry">ENTRY_${locked[lockIdx++ % locked.length]}</span> (<span class="t-red">LOCKED</span>)`,
+        () => `<span class="t-ts">${nowTs()}</span> <span class="t-key">LOG_FLUSH:</span> <span class="t-ok">COMPLETED</span>`,
+        () => `<span class="t-ts">${nowTs()}</span> <span class="t-key">VAULT_SEAL:</span> <span class="t-ok">INTACT</span>`,
+        () => `<span class="t-ts">${nowTs()}</span> <span class="t-key">DB_HEARTBEAT:</span> <span class="t-ok">OK — ${Math.floor(Math.random()*10+4)}ms</span>`,
+      ];
+
+      let evIdx = 0;
+      setInterval(() => {
+        const line = document.createElement('div');
+        line.className = 't-line';
+        line.innerHTML = events[evIdx % events.length]();
+        evIdx++;
+        body.appendChild(line);
+        body.scrollTop = body.scrollHeight;
+        while (body.children.length > 30) body.removeChild(body.firstChild!);
+
+        const mp = document.getElementById('memory-pct');
+        if (mp) {
+          let cur = parseInt(mp.textContent || '0', 10);
+          if (cur < 98) mp.textContent = String(cur + (Math.random() > 0.85 ? 1 : 0));
+        }
+      }, 2200);
+    })();
+  </script>
+
+</body>
+</html>

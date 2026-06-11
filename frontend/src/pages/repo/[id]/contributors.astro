@@ -1,0 +1,918 @@
+---
+// GLYPH OS — Contributor Intelligence Profiles
+// src/pages/repo/[id]/contributors.astro
+
+const { id } = Astro.params;
+
+let repoOwner = 'unknown';
+let repoName  = 'unknown';
+try {
+  const decoded = decodeURIComponent(id ?? '');
+  const match   = decoded.match(/github\.com\/([^\/]+)\/([^\/\s]+)/);
+  if (match) {
+    repoOwner = match[1];
+    repoName  = match[2].replace(/\.git$/, '');
+  } else {
+    const parts = decoded.split('/').filter(Boolean);
+    if (parts.length >= 2) { repoOwner = parts[0]; repoName = parts[1]; }
+    else if (parts.length === 1) { repoName = parts[0]; }
+  }
+} catch (_) {}
+
+// ── Static seed (replaced by GET /repo/:id/contributors) ──
+interface Contributor {
+  handle:      string;
+  role:        string;
+  decisions:   number;
+  debates:     number;
+  rejections:  number;
+  influence:   number;   // 0-100
+  pattern:     string;
+  reasoning:   string;
+  nodeId:      string;   // display ID e.g. AP-992-X
+}
+
+const contributors: Contributor[] = [
+  {
+    handle:     'arch_priya',
+    role:       'ARCHITECT',
+    decisions:  142,
+    debates:    892,
+    rejections: 14,
+    influence:  82,
+    pattern:    'ARCHITECTURAL_AUTHORITY',
+    reasoning:  'Prioritizes long-term scalability over immediate implementation speed. Reasoning often cites structural integrity and cross-module dependency resilience.',
+    nodeId:     'AP-992-X',
+  },
+  {
+    handle:     'lead_author',
+    role:       'LEAD AUTHOR',
+    decisions:  204,
+    debates:    412,
+    rejections: 29,
+    influence:  74,
+    pattern:    'SYSTEM_COHESION',
+    reasoning:  'Focuses on consensus-building and documentation clarity. Tendency to favor proven design patterns over experimental optimizations.',
+    nodeId:     'LA-104-Y',
+  },
+  {
+    handle:     'dev_soren',
+    role:       'REVIEWER',
+    decisions:  88,
+    debates:    310,
+    rejections: 41,
+    influence:  61,
+    pattern:    'PERFORMANCE_CRITICAL',
+    reasoning:  'Flags long-term maintenance risk consistently. Rejection-heavy profile. Prefers battle-tested over novel. Slows adoption cycles deliberately.',
+    nodeId:     'DS-447-R',
+  },
+  {
+    handle:     'infra_tolly',
+    role:       'INFRA ENGINEER',
+    decisions:  56,
+    debates:    198,
+    rejections: 22,
+    influence:  48,
+    pattern:    'INFRA_GATEKEEPER',
+    reasoning:  'Controls deployment and infrastructure gates. Low debate presence but high veto frequency. Decisions cluster around operational concerns.',
+    nodeId:     'IT-211-G',
+  },
+  {
+    handle:     'sec_ananya',
+    role:       'SECURITY ANALYST',
+    decisions:  31,
+    debates:    144,
+    rejections: 18,
+    influence:  39,
+    pattern:    'SECURITY_HARDENING',
+    reasoning:  'Intervenes on auth and credential surface decisions. Low volume, high specificity. BYOK model was her sole top-level architectural contribution.',
+    nodeId:     'SA-089-S',
+  },
+  {
+    handle:     'analytics_reed',
+    role:       'MODERATOR',
+    decisions:  19,
+    debates:    267,
+    rejections: 11,
+    influence:  31,
+    pattern:    'CONSENSUS_BUILDER',
+    reasoning:  'Rarely authors decisions. Mediates contested debates. Contributor scoring feature was rejected under his watch — insufficient commit evidence.',
+    nodeId:     'AR-033-M',
+  },
+];
+
+const maxInfluence = Math.max(...contributors.map(c => c.influence));
+
+const registryStats = {
+  total:         contributors.length,
+  totalDecisions: contributors.reduce((a, c) => a + c.decisions, 0),
+  participation:  '94.2',
+  avgInfluence:   (contributors.reduce((a, c) => a + c.influence, 0) / contributors.length).toFixed(1),
+};
+
+const initials = (h: string) =>
+  h.split('_').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GLYPH — Contributors — {repoOwner}/{repoName}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset ───────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+      transition: none !important;
+      outline: none;
+    }
+    html, body {
+      margin: 0; padding: 0;
+      background: #131313;
+      color: #e5e2e1;
+      font-family: 'Karla', sans-serif;
+      height: 100%; overflow: hidden;
+    }
+
+    /* ── Type ─────────────────────────────────────────────── */
+    .data-sm    { font-family:'JetBrains Mono',monospace; font-size:0.6875rem; line-height:1.2; }
+    .label-caps { font-family:'JetBrains Mono',monospace; font-size:0.625rem; letter-spacing:0.1em; text-transform:uppercase; line-height:1; }
+
+    /* ══════════════════════════════════════════════════════
+       NAVBAR — 44px
+    ══════════════════════════════════════════════════════ */
+    #navbar {
+      position: fixed; top:0; left:0; right:0; height:44px;
+      background:#131313; border-bottom:1px solid #262626;
+      display:grid; grid-template-columns:160px 1fr auto;
+      align-items:center; z-index:200;
+    }
+    #nav-brand {
+      padding:0 14px; display:flex; flex-direction:column; gap:2px;
+      border-right:1px solid #262626; height:100%; justify-content:center;
+    }
+    #nav-brand a {
+      font-family:'Space Grotesk',sans-serif; font-weight:700;
+      font-size:0.875rem; color:#ffb4a8; text-decoration:none; line-height:1;
+    }
+    #nav-brand .sub {
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      color:#a1a1a1; letter-spacing:0.06em; text-transform:uppercase;
+    }
+    #nav-center {
+      padding:0 18px; display:flex; align-items:center; gap:16px;
+    }
+    #nav-center .wordmark {
+      font-family:'Space Grotesk',sans-serif; font-weight:700;
+      font-size:0.9rem; color:#ffb4a8; letter-spacing:-0.01em;
+    }
+    #nav-center .version {
+      font-family:'JetBrains Mono',monospace; font-size:0.6rem; color:#a1a1a1;
+    }
+    /* Search bar */
+    #nav-search-wrap {
+      display:flex; align-items:center; border:1px solid #262626;
+      height:26px; margin-left:auto;
+    }
+    #nav-search-wrap svg { margin:0 6px; flex-shrink:0; color:#5e3f3a; }
+    #nav-search-wrap input {
+      background:transparent; border:none; font-family:'JetBrains Mono',monospace;
+      font-size:0.6rem; color:#e5e2e1; letter-spacing:0.06em;
+      width:140px; padding:0 8px 0 0;
+    }
+    #nav-search-wrap input::placeholder { color:#3a3a3a; }
+    #nav-right {
+      display:flex; align-items:center; gap:8px; padding:0 16px 0 12px;
+    }
+    .nav-icon-btn {
+      width:28px; height:28px; background:transparent;
+      border:1px solid #262626; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      color:#a1a1a1; padding:0;
+    }
+    .nav-icon-btn:hover { border-color:#cc0000; color:#cc0000; }
+
+    /* ══════════════════════════════════════════════════════
+       LAYOUT
+    ══════════════════════════════════════════════════════ */
+    #layout {
+      position:fixed; top:44px; left:0; right:0; bottom:0; display:flex;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       SIDEBAR — 160px
+    ══════════════════════════════════════════════════════ */
+    #sidebar {
+      width:160px; flex-shrink:0;
+      background:#131313; border-right:1px solid #262626;
+      display:flex; flex-direction:column; overflow:hidden;
+    }
+    /* Sidebar user badge */
+    #sidebar-user {
+      padding:10px 14px; border-bottom:1px solid #262626;
+    }
+    .sb-user-label {
+      font-family:'JetBrains Mono',monospace; font-size:0.6rem;
+      letter-spacing:0.1em; text-transform:uppercase; color:#cc0000;
+      display:block;
+    }
+    .sb-user-sub {
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      color:#5e3f3a; letter-spacing:0.06em; text-transform:uppercase;
+    }
+    .sidebar-nav { flex:1; display:flex; flex-direction:column; padding-top:4px; }
+    .nav-item {
+      display:flex; align-items:center; gap:9px; padding:8px 14px;
+      font-family:'JetBrains Mono',monospace; font-size:0.6rem;
+      letter-spacing:0.12em; text-transform:uppercase;
+      color:#a1a1a1; cursor:pointer; user-select:none;
+      border:none; border-left:2px solid transparent;
+      background:transparent; width:100%; text-align:left; text-decoration:none;
+    }
+    .nav-item:hover:not(.active) { color:#e5e2e1; background:#1a1a1a; }
+    .nav-item.active { border-left-color:#cc0000; color:#ffffff; background:transparent; }
+    .sidebar-spacer { flex:1; }
+    /* Docs & logout */
+    .nav-item-util { color:#5e3f3a; border-top:none; }
+    .nav-item-util:hover { color:#cc0000; }
+    .sidebar-footer {
+      border-top:1px solid #262626; padding:10px;
+      display:flex; flex-direction:column; gap:8px;
+    }
+    #execute-fetch {
+      width:100%; background:#cc0000; border:none;
+      font-family:'JetBrains Mono',monospace; font-size:0.6rem;
+      letter-spacing:0.12em; text-transform:uppercase;
+      color:#fff; padding:8px 0; cursor:pointer; text-align:center;
+    }
+    #execute-fetch:hover { background:#ff0000; }
+    .util-row { display:flex; gap:6px; }
+    .util-btn {
+      flex:1; display:flex; align-items:center; gap:5px;
+      background:transparent; border:1px solid #262626;
+      color:#a1a1a1; font-family:'JetBrains Mono',monospace;
+      font-size:0.55rem; letter-spacing:0.1em; text-transform:uppercase;
+      padding:5px 6px; cursor:pointer; text-decoration:none;
+    }
+    .util-btn:hover { border-color:#cc0000; color:#cc0000; }
+
+    /* ══════════════════════════════════════════════════════
+       MAIN AREA
+    ══════════════════════════════════════════════════════ */
+    #main-area {
+      flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0;
+    }
+
+    /* ── Page header ─────────────────────────────────────── */
+    #page-header {
+      padding:14px 20px 12px; border-bottom:1px solid #262626; flex-shrink:0;
+    }
+    .breadcrumb-row { display:flex; align-items:center; gap:8px; margin-bottom:5px; }
+    .bc-primary { font-family:'JetBrains Mono',monospace; font-size:0.6rem; letter-spacing:0.12em; text-transform:uppercase; color:#a1a1a1; }
+    .bc-sep     { color:#3a3a3a; font-size:0.75rem; }
+    .bc-status  { font-family:'JetBrains Mono',monospace; font-size:0.6rem; letter-spacing:0.12em; text-transform:uppercase; color:#cc0000; }
+    .page-title { font-family:'Space Grotesk',sans-serif; font-weight:700; font-size:1.75rem; color:#ffb4a8; line-height:1; margin:0 0 6px; letter-spacing:-0.01em; }
+    .page-desc  { font-family:'Karla',sans-serif; font-size:0.875rem; color:#a1a1a1; line-height:1.5; margin:0; max-width:680px; }
+
+    /* ── Content body ────────────────────────────────────── */
+    #content-body {
+      flex:1; display:grid;
+      grid-template-columns: 1fr 240px;
+      grid-template-rows: 1fr 160px;
+      overflow:hidden; min-height:0;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       CONTRIBUTOR LIST — scrollable left col
+    ══════════════════════════════════════════════════════ */
+    #contrib-list {
+      grid-column:1; grid-row:1;
+      border-right:1px solid #262626;
+      overflow-y:auto; padding:16px 20px;
+      display:flex; flex-direction:column; gap:12px;
+    }
+    #contrib-list::-webkit-scrollbar { width:3px; }
+    #contrib-list::-webkit-scrollbar-track { background:#131313; }
+    #contrib-list::-webkit-scrollbar-thumb { background:#262626; }
+
+    /* ── Contributor block ───────────────────────────────── */
+    .contrib-block { background:#0e0e0e; border:1px solid #262626; }
+
+    /* Header row */
+    .cb-header {
+      display:flex; align-items:center; gap:12px;
+      padding:10px 14px; border-bottom:1px solid #262626;
+    }
+    .cb-avatar {
+      width:36px; height:36px; background:#1a1a1a;
+      display:flex; align-items:center; justify-content:center;
+      flex-shrink:0;
+    }
+    .cb-avatar-text {
+      font-family:'JetBrains Mono',monospace; font-weight:700;
+      font-size:0.75rem; color:#cc0000; letter-spacing:0.04em;
+    }
+    .cb-identity { flex:1; display:flex; flex-direction:column; gap:5px; }
+    .cb-handle {
+      font-family:'Space Grotesk',sans-serif; font-weight:600;
+      font-size:0.9rem; color:#e5e2e1;
+    }
+    .cb-handle-prefix { color:#5e3f3a; }
+    .cb-role-row { display:flex; align-items:center; gap:8px; }
+    .cb-role-chip {
+      font-family:'JetBrains Mono',monospace; font-size:0.5rem;
+      letter-spacing:0.1em; text-transform:uppercase;
+      color:#cc0000; border:1px solid #cc0000;
+      padding:2px 6px; background:transparent; line-height:1.4;
+    }
+    .cb-influence-tag {
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      letter-spacing:0.08em; text-transform:uppercase; color:#a1a1a1;
+    }
+    .cb-influence-val {
+      font-family:'JetBrains Mono',monospace; font-weight:700;
+      font-size:0.75rem; color:#cc0000;
+    }
+    .cb-node-id {
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      color:#3a3a3a; letter-spacing:0.06em; margin-left:auto; align-self:flex-start;
+    }
+
+    /* Stats strip */
+    .cb-stats {
+      display:grid; grid-template-columns:repeat(3,1fr);
+      border-bottom:1px solid #262626;
+    }
+    .cb-stat-cell {
+      padding:9px 14px; border-right:1px solid #262626; text-align:center;
+    }
+    .cb-stat-cell:last-child { border-right:none; }
+    .cb-stat-val {
+      font-family:'JetBrains Mono',monospace; font-weight:700;
+      font-size:1.1rem; color:#e5e2e1; display:block; line-height:1;
+      margin-bottom:3px;
+    }
+    .cb-stat-label {
+      font-family:'JetBrains Mono',monospace; font-size:0.5rem;
+      letter-spacing:0.1em; text-transform:uppercase; color:#a1a1a1;
+    }
+
+    /* Reasoning profile */
+    .cb-reasoning { padding:10px 14px; border-bottom:1px solid #262626; }
+    .cb-reasoning-label {
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      letter-spacing:0.1em; text-transform:uppercase; color:#cc0000;
+      display:block; margin-bottom:5px;
+    }
+    .cb-reasoning-text {
+      font-family:'Karla',sans-serif; font-style:italic;
+      font-size:0.8125rem; color:#a1a1a1; line-height:1.5;
+      display:-webkit-box; -webkit-line-clamp:2;
+      -webkit-box-orient:vertical; overflow:hidden;
+    }
+
+    /* Footer row */
+    .cb-footer {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:7px 14px;
+    }
+    .cb-pattern-label { font-family:'JetBrains Mono',monospace; font-size:0.55rem; letter-spacing:0.1em; text-transform:uppercase; color:#a1a1a1; }
+    .cb-pattern-val   { font-family:'JetBrains Mono',monospace; font-size:0.55rem; letter-spacing:0.1em; text-transform:uppercase; color:#cc0000; }
+    .cb-id-tag        { font-family:'JetBrains Mono',monospace; font-size:0.55rem; color:#3a3a3a; }
+
+    /* ══════════════════════════════════════════════════════
+       RIGHT PANEL — registry stats + charts
+    ══════════════════════════════════════════════════════ */
+    #right-panel {
+      grid-column:2; grid-row:1;
+      border-bottom:1px solid #262626;
+      background:#131313; overflow-y:auto;
+      display:flex; flex-direction:column;
+    }
+    #right-panel::-webkit-scrollbar { width:3px; }
+    #right-panel::-webkit-scrollbar-track { background:#131313; }
+    #right-panel::-webkit-scrollbar-thumb { background:#262626; }
+
+    .rp-section { padding:12px 14px; border-bottom:1px solid #262626; }
+    .rp-section:last-child { border-bottom:none; }
+    .rp-label {
+      font-family:'JetBrains Mono',monospace; font-size:0.6rem;
+      letter-spacing:0.12em; text-transform:uppercase; color:#cc0000;
+      display:flex; align-items:center; gap:6px; margin-bottom:10px;
+    }
+    .rp-label-dot { width:6px; height:6px; background:#cc0000; flex-shrink:0; }
+
+    /* Registry stat rows */
+    .rp-stat-row {
+      display:flex; align-items:baseline; justify-content:space-between;
+      margin-bottom:8px;
+    }
+    .rp-stat-row:last-child { margin-bottom:0; }
+    .rp-stat-key {
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      letter-spacing:0.08em; text-transform:uppercase; color:#a1a1a1;
+    }
+    .rp-stat-val {
+      font-family:'JetBrains Mono',monospace; font-weight:700;
+      font-size:1.1rem; color:#e5e2e1; line-height:1;
+    }
+
+    /* Influence histogram */
+    .inf-bar-row {
+      display:flex; align-items:center; gap:8px; margin-bottom:6px;
+    }
+    .inf-bar-row:last-child { margin-bottom:0; }
+    .inf-bar-handle {
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      letter-spacing:0.04em; color:#a1a1a1; width:76px; flex-shrink:0;
+      text-transform:uppercase;
+    }
+    .inf-bar-track { flex:1; height:3px; background:#1a1a1a; position:relative; }
+    .inf-bar-fill  { height:3px; background:#cc0000; }
+    .inf-bar-pct {
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      color:#cc0000; width:30px; text-align:right; flex-shrink:0;
+    }
+
+    /* Pattern breakdown */
+    .pattern-row {
+      display:flex; align-items:center; gap:8px; margin-bottom:7px;
+    }
+    .pattern-row:last-child { margin-bottom:0; }
+    .pattern-dot { width:5px; height:5px; background:#cc0000; flex-shrink:0; }
+    .pattern-name {
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      letter-spacing:0.06em; text-transform:uppercase; color:#a1a1a1; flex:1;
+    }
+    .pattern-owner {
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      color:#5e3f3a;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       BOTTOM FEED
+    ══════════════════════════════════════════════════════ */
+    #feed-panel {
+      grid-column:1/3; grid-row:2;
+      display:flex; flex-direction:column;
+      background:#0e0e0e; overflow:hidden;
+    }
+    #feed-header {
+      padding:6px 14px; border-bottom:1px solid #262626;
+      background:#131313; flex-shrink:0;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .feed-header-left {
+      display:flex; align-items:center; gap:8px;
+      font-family:'JetBrains Mono',monospace; font-size:0.6rem;
+      letter-spacing:0.1em; text-transform:uppercase; color:#e5e2e1;
+    }
+    .feed-sq { width:7px; height:7px; background:#cc0000; }
+    .feed-sep { color:#5e3f3a; }
+    .feed-header-right {
+      font-family:'JetBrains Mono',monospace; font-size:0.6rem; color:#a1a1a1;
+    }
+    /* Right side — EXECUTE_FETCH + util buttons */
+    #feed-actions {
+      display:flex; align-items:center; gap:8px;
+    }
+    #feed-exec-btn {
+      background:#cc0000; border:none;
+      font-family:'JetBrains Mono',monospace; font-size:0.6rem;
+      letter-spacing:0.12em; text-transform:uppercase;
+      color:#fff; padding:6px 14px; cursor:pointer;
+    }
+    #feed-exec-btn:hover { background:#ff0000; }
+    .feed-ghost-btn {
+      background:transparent; border:1px solid #262626;
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      letter-spacing:0.1em; text-transform:uppercase;
+      color:#a1a1a1; padding:5px 10px; cursor:pointer;
+    }
+    .feed-ghost-btn:hover { border-color:#cc0000; color:#cc0000; }
+
+    #feed-body {
+      flex:1; overflow-y:auto; padding:6px 14px;
+      display:flex; flex-direction:column;
+    }
+    #feed-body::-webkit-scrollbar { width:3px; }
+    #feed-body::-webkit-scrollbar-track { background:#0e0e0e; }
+    #feed-body::-webkit-scrollbar-thumb { background:#262626; }
+
+    .f-line {
+      font-family:'JetBrains Mono',monospace; font-size:0.6rem;
+      line-height:1.65; white-space:nowrap; color:#a1a1a1; letter-spacing:0.04em;
+    }
+    .f-tag  { color:#cc0000; font-weight:700; }
+    .f-mute { color:#a1a1a1; }
+    .f-em   { color:#e5e2e1; }
+    .f-rust { color:#5e3f3a; }
+  </style>
+</head>
+<body>
+
+  <!-- ════════════════════════════════════════════════════════
+       NAVBAR
+  ═════════════════════════════════════════════════════════ -->
+  <nav id="navbar" aria-label="System navigation">
+    <div id="nav-brand">
+      <a href="/" aria-label="GLYPH home">GLYPH_OS</a>
+      <span class="sub">SYSTEM_OPERATOR</span>
+    </div>
+    <div id="nav-center">
+      <span class="wordmark">GLYPH_OS</span>
+      <span class="version">v4.0.1-stable</span>
+      <div id="nav-search-wrap" role="search" style="margin-left:auto;">
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+          <circle cx="4.5" cy="4.5" r="3.5" stroke="currentColor" stroke-width="1"/>
+          <line x1="7.5" y1="7.5" x2="10" y2="10" stroke="currentColor" stroke-width="1"/>
+        </svg>
+        <input type="search" placeholder="SYS_SEARCH..." autocomplete="off" spellcheck="false" aria-label="System search" />
+      </div>
+    </div>
+    <div id="nav-right">
+      <button class="nav-icon-btn" aria-label="Settings" title="Settings">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+          <circle cx="6.5" cy="6.5" r="2" stroke="currentColor" stroke-width="1"/>
+          <path d="M6.5 1v1.5M6.5 10.5V12M1 6.5h1.5M10.5 6.5H12M2.6 2.6l1.1 1.1M9.3 9.3l1.1 1.1M2.6 10.4l1.1-1.1M9.3 3.7l1.1-1.1" stroke="currentColor" stroke-width="1"/>
+        </svg>
+      </button>
+      <button class="nav-icon-btn" aria-label="Grid view" title="Grid">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+          <rect x="0" y="0" width="5" height="5" fill="currentColor"/>
+          <rect x="7" y="0" width="5" height="5" fill="currentColor"/>
+          <rect x="0" y="7" width="5" height="5" fill="currentColor"/>
+          <rect x="7" y="7" width="5" height="5" fill="currentColor"/>
+        </svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ════════════════════════════════════════════════════════
+       LAYOUT
+  ═════════════════════════════════════════════════════════ -->
+  <div id="layout">
+
+    <!-- ── SIDEBAR ───────────────────────────────────────── -->
+    <aside id="sidebar" aria-label="Navigation">
+      <div id="sidebar-user">
+        <span class="sb-user-label">SYSTEM OPERATOR</span>
+        <span class="sb-user-sub">LEVEL 07 CLEAR</span>
+      </div>
+
+      <nav class="sidebar-nav" aria-label="Sections">
+
+        <a href={`/repo/${id}/decisions`} class="nav-item" aria-label="Decisions">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <rect x="0" y="0" width="10" height="10" stroke="currentColor" stroke-width="1" fill="none"/>
+            <polyline points="2,5 4,7 8,3" stroke="currentColor" stroke-width="1" fill="none"/>
+          </svg>
+          DECISIONS
+        </a>
+
+        <a href="#" class="nav-item active" aria-current="page" aria-label="Contributors — active">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <circle cx="3.5" cy="3" r="2" stroke="currentColor" stroke-width="1"/>
+            <circle cx="7.5" cy="3" r="2" stroke="currentColor" stroke-width="1"/>
+            <path d="M0 9c0-2 1.5-3 3.5-3s3.5 1 3.5 3" stroke="currentColor" stroke-width="1" fill="none"/>
+            <path d="M7 6.5c1.2 0 3 0.6 3 2.5" stroke="currentColor" stroke-width="1" fill="none"/>
+          </svg>
+          CONTRIBUTORS
+        </a>
+
+        <a href={`/repo/${id}`} class="nav-item" aria-label="Terminal">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <rect x="0" y="0" width="10" height="10" stroke="currentColor" stroke-width="1" fill="none"/>
+            <polyline points="2,4 4,5 2,6" stroke="currentColor" stroke-width="1" fill="none"/>
+            <line x1="5" y1="7" x2="8" y2="7" stroke="currentColor" stroke-width="1"/>
+          </svg>
+          TERMINAL
+        </a>
+
+        <a href={`/repo/${id}`} class="nav-item" aria-label="Uplink">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <line x1="5" y1="1" x2="5" y2="7" stroke="currentColor" stroke-width="1"/>
+            <polyline points="2,4 5,1 8,4" stroke="currentColor" stroke-width="1" fill="none"/>
+            <line x1="1" y1="9" x2="9" y2="9" stroke="currentColor" stroke-width="1"/>
+          </svg>
+          UPLINK
+        </a>
+
+        <a href={`/repo/${id}/rejections`} class="nav-item" aria-label="Archive">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <rect x="0" y="3" width="10" height="7" stroke="currentColor" stroke-width="1" fill="none"/>
+            <rect x="0" y="0" width="10" height="3" stroke="currentColor" stroke-width="1" fill="none"/>
+            <line x1="3.5" y1="6" x2="6.5" y2="6" stroke="currentColor" stroke-width="1"/>
+          </svg>
+          ARCHIVE
+        </a>
+
+        <a href="#" class="nav-item" aria-label="Sensors">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <circle cx="5" cy="5" r="1.5" stroke="currentColor" stroke-width="1"/>
+            <path d="M2.5 2.5 C1 3.5 1 6.5 2.5 7.5" stroke="currentColor" stroke-width="1" fill="none"/>
+            <path d="M7.5 2.5 C9 3.5 9 6.5 7.5 7.5" stroke="currentColor" stroke-width="1" fill="none"/>
+          </svg>
+          SENSORS
+        </a>
+
+        <a href={`/repo/${id}/debates`} class="nav-item" aria-label="Decrypt">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <rect x="2" y="4" width="6" height="5" stroke="currentColor" stroke-width="1" fill="none"/>
+            <path d="M3,4 L3,3 C3,1.3 7,1.3 7,3 L7,4" stroke="currentColor" stroke-width="1" fill="none"/>
+          </svg>
+          DECRYPT
+        </a>
+
+        <a href="#" class="nav-item" aria-label="System">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <circle cx="5" cy="5" r="2" stroke="currentColor" stroke-width="1"/>
+            <path d="M5 1v1M5 8v1M1 5h1M8 5h1" stroke="currentColor" stroke-width="1"/>
+          </svg>
+          SYSTEM
+        </a>
+
+        <span class="sidebar-spacer"></span>
+
+        <a href="#" class="nav-item nav-item-util" aria-label="Docs">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <rect x="1" y="0" width="8" height="10" stroke="currentColor" stroke-width="1" fill="none"/>
+            <line x1="3" y1="3" x2="7" y2="3" stroke="currentColor" stroke-width="0.8"/>
+            <line x1="3" y1="5" x2="7" y2="5" stroke="currentColor" stroke-width="0.8"/>
+            <line x1="3" y1="7" x2="5.5" y2="7" stroke="currentColor" stroke-width="0.8"/>
+          </svg>
+          DOCS
+        </a>
+
+        <a href="/" class="nav-item nav-item-util" aria-label="Logout">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <path d="M4 2H1V9H4" stroke="currentColor" stroke-width="1" fill="none"/>
+            <line x1="5" y1="5" x2="10" y2="5" stroke="currentColor" stroke-width="1"/>
+            <polyline points="8,3 10,5 8,7" stroke="currentColor" stroke-width="1" fill="none"/>
+          </svg>
+          LOGOUT
+        </a>
+
+      </nav>
+    </aside>
+
+    <!-- ── MAIN AREA ──────────────────────────────────────── -->
+    <div id="main-area">
+
+      <!-- Page header -->
+      <header id="page-header">
+        <div class="breadcrumb-row">
+          <span class="bc-primary">CONTRIBUTOR_REGISTRY</span>
+          <span class="bc-sep">/</span>
+          <span class="bc-status">STATUS: PROFILES</span>
+        </div>
+        <h1 class="page-title">CONTRIBUTOR INTELLIGENCE PROFILES</h1>
+        <p class="page-desc">
+          Neural-extracted reasoning profiles for each contributor. Derived from decision authorship, debate participation, and rejection ownership.
+        </p>
+      </header>
+
+      <div id="content-body">
+
+        <!-- ── CONTRIBUTOR LIST ───────────────────────────── -->
+        <div id="contrib-list" role="list" aria-label="Contributor profiles">
+          {contributors.map((c) => (
+            <div class="contrib-block" role="listitem" aria-label={`Contributor: ${c.handle}`}>
+
+              <!-- Header -->
+              <div class="cb-header">
+                <div class="cb-avatar" aria-hidden="true">
+                  <span class="cb-avatar-text">{initials(c.handle)}</span>
+                </div>
+                <div class="cb-identity">
+                  <span class="cb-handle">
+                    <span class="cb-handle-prefix">@</span>{c.handle}
+                  </span>
+                  <div class="cb-role-row">
+                    <span class="cb-role-chip">{c.role}</span>
+                    <span class="cb-influence-tag">INFLUENCE_WEIGHT:</span>
+                    <span class="cb-influence-val">{c.influence}%</span>
+                  </div>
+                </div>
+                <!-- Copy icon placeholder -->
+                <div style="margin-left:auto;color:#3a3a3a;" aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                    <rect x="3" y="3" width="8" height="8" stroke="currentColor" stroke-width="1"/>
+                    <rect x="1" y="1" width="8" height="8" stroke="currentColor" stroke-width="1" fill="#131313"/>
+                  </svg>
+                </div>
+              </div>
+
+              <!-- Stats strip -->
+              <div class="cb-stats" aria-label={`Stats: ${c.decisions} decisions, ${c.debates} debates, ${c.rejections} rejections`}>
+                <div class="cb-stat-cell">
+                  <span class="cb-stat-val">{c.decisions.toLocaleString()}</span>
+                  <span class="cb-stat-label">DECISIONS</span>
+                </div>
+                <div class="cb-stat-cell">
+                  <span class="cb-stat-val">{c.debates.toLocaleString()}</span>
+                  <span class="cb-stat-label">DEBATES</span>
+                </div>
+                <div class="cb-stat-cell">
+                  <span class="cb-stat-val">{c.rejections}</span>
+                  <span class="cb-stat-label">REJECTIONS</span>
+                </div>
+              </div>
+
+              <!-- Reasoning -->
+              <div class="cb-reasoning">
+                <span class="cb-reasoning-label">REASONING_PROFILE:</span>
+                <p class="cb-reasoning-text">{c.reasoning}</p>
+              </div>
+
+              <!-- Footer -->
+              <div class="cb-footer">
+                <div style="display:flex;align-items:center;gap:6px;">
+                  <span class="cb-pattern-label">DOMINANT_PATTERN:</span>
+                  <span class="cb-pattern-val">{c.pattern}</span>
+                </div>
+                <span class="cb-id-tag">ID: {c.nodeId}</span>
+              </div>
+
+            </div>
+          ))}
+        </div>
+
+        <!-- ── RIGHT PANEL ────────────────────────────────── -->
+        <aside id="right-panel" aria-label="Registry intelligence">
+
+          <!-- Registry stats -->
+          <div class="rp-section">
+            <div class="rp-label">
+              <span class="rp-label-dot" aria-hidden="true"></span>
+              REGISTRY_STATS
+            </div>
+            <div class="rp-stat-row" aria-label={`Total contributors: ${registryStats.total}`}>
+              <span class="rp-stat-key">TOTAL CONTRIBUTORS</span>
+              <span class="rp-stat-val">{registryStats.total}</span>
+            </div>
+            <div class="rp-stat-row" aria-label={`Total decisions: ${registryStats.totalDecisions}`}>
+              <span class="rp-stat-key">TOTAL DECISIONS</span>
+              <span class="rp-stat-val">{registryStats.totalDecisions.toLocaleString()}</span>
+            </div>
+            <div class="rp-stat-row" aria-label={`Participation: ${registryStats.participation}%`}>
+              <span class="rp-stat-key">PARTICIPATION %</span>
+              <span class="rp-stat-val">{registryStats.participation}%</span>
+            </div>
+            <div class="rp-stat-row" aria-label={`Average influence: ${registryStats.avgInfluence}%`}>
+              <span class="rp-stat-key">AVG INFLUENCE</span>
+              <span class="rp-stat-val">{registryStats.avgInfluence}%</span>
+            </div>
+          </div>
+
+          <!-- Influence histogram -->
+          <div class="rp-section">
+            <div class="rp-label">
+              <span class="rp-label-dot" aria-hidden="true"></span>
+              INFLUENCE_HIST
+            </div>
+            {contributors.map((c) => (
+              <div class="inf-bar-row" aria-label={`${c.handle}: ${c.influence}%`}>
+                <span class="inf-bar-handle">{c.handle.replace('_',' ').toUpperCase().slice(0,10)}</span>
+                <div class="inf-bar-track" aria-hidden="true">
+                  <div class="inf-bar-fill" style={`width:${Math.round(c.influence / maxInfluence * 100)}%`}></div>
+                </div>
+                <span class="inf-bar-pct">{c.influence}%</span>
+              </div>
+            ))}
+          </div>
+
+          <!-- Pattern breakdown -->
+          <div class="rp-section">
+            <div class="rp-label">
+              <span class="rp-label-dot" aria-hidden="true"></span>
+              PATTERN_BREAKDOWN
+            </div>
+            {contributors.map((c) => (
+              <div class="pattern-row" aria-label={`${c.pattern}: ${c.handle}`}>
+                <span class="pattern-dot" aria-hidden="true"></span>
+                <span class="pattern-name">{c.pattern.replace(/_/g,' ').toLowerCase()}</span>
+                <span class="pattern-owner">@{c.handle.split('_')[0]}</span>
+              </div>
+            ))}
+          </div>
+
+        </aside>
+
+        <!-- ── BOTTOM FEED ────────────────────────────────── -->
+        <section id="feed-panel" aria-labelledby="feed-title">
+          <div id="feed-header">
+            <div class="feed-header-left" id="feed-title">
+              <span class="feed-sq" aria-hidden="true"></span>
+              CONTRIBUTOR_INTEL_FEED
+              <span class="feed-sep">//</span>
+              ACTIVE
+            </div>
+            <div id="feed-actions">
+              <span class="feed-header-right" style="margin-right:12px;">PROFILES: {contributors.length}</span>
+              <button id="feed-exec-btn" type="button" aria-label="Execute fetch">EXECUTE_FETCH</button>
+              <button class="feed-ghost-btn" type="button" aria-label="Export CSV">EXPORT_CSV</button>
+              <button class="feed-ghost-btn" type="button" aria-label="Purge cache">PURGE_CACHE</button>
+            </div>
+          </div>
+          <div id="feed-body" role="log" aria-label="Contributor intelligence feed" aria-live="polite">
+            <!-- Seed lines matching screenshot -->
+            <div class="f-line"><span class="f-mute">[MATCH] Heuristic overlap found between </span><span class="f-em">@arch_priya</span><span class="f-mute"> and </span><span class="f-em">@dev_soren</span></div>
+            <div class="f-line"><span class="f-mute">[QUERY] Fetching authorship weight for PR-9821...</span></div>
+            <div class="f-line"><span class="f-mute">[MATCH] Heuristic overlap found between </span><span class="f-em">@arch_priya</span><span class="f-mute"> and </span><span class="f-em">@dev_soren</span></div>
+            <div class="f-line"><span class="f-tag">[PROFILE]</span><span class="f-rust"> @lead_author</span><span class="f-mute"> reasoning extracted...</span></div>
+            <div class="f-line"><span class="f-mute">[DECRYPT] Reasoning hashes validated for </span><span class="f-em">@sec_ananya</span></div>
+            <div class="f-line"><span class="f-rust">[QUERY] Fetching authorship weight for PR-9821...</span></div>
+          </div>
+        </section>
+
+      </div><!-- /content-body -->
+    </div><!-- /main-area -->
+  </div><!-- /layout -->
+
+  <!-- ════════════════════════════════════════════════════════
+       SCRIPTS
+  ═════════════════════════════════════════════════════════ -->
+  <script define:vars={{ seedContributors: contributors }}>
+    const API_BASE = (window as any).__GLYPH_API__ ?? (import.meta as any).env?.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+
+    // ── Hydrate from real API ─────────────────────────────
+    (function hydrateContributors() {
+      const pathParts = window.location.pathname.split('/').filter(Boolean);
+      const jobId     = pathParts[1] ?? '';
+      const uuidRe    = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRe.test(jobId)) return;
+
+      fetch(`${API_BASE}/api/repo/${jobId}/contributors`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!data?.contributors?.length) return;
+          // Update influence histogram bars with real data
+          // (full re-render reserved for v2 — API shapes match seed)
+        })
+        .catch(() => {});
+    })();
+
+    // ── Execute fetch ─────────────────────────────────────
+    (function() {
+      const btns = [
+        document.getElementById('feed-exec-btn'),
+      ];
+      btns.forEach(btn => {
+        if (!btn) return;
+        btn.addEventListener('click', () => {
+          btn.textContent = 'FETCHING...';
+          setTimeout(() => { btn.textContent = 'EXECUTE_FETCH'; }, 2000);
+        });
+      });
+    })();
+
+    // ── Live feed ─────────────────────────────────────────
+    (function initFeed() {
+      const body = document.getElementById('feed-body');
+      if (!body) return;
+
+      const cs      = seedContributors;
+      const handles = cs.map(c => c.handle);
+      const patterns= cs.map(c => c.pattern);
+      let   hi = 0, pi = 0, di = 1, ri = 1, pri = 9821;
+
+      function ts() {
+        const d = new Date();
+        return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}:${String(d.getSeconds()).padStart(2,'0')}`;
+      }
+
+      const pool = [
+        () => `<span class="f-tag">[PROFILE]</span><span class="f-rust"> @${handles[hi++ % handles.length]}</span><span class="f-mute"> — reasoning profile extracted</span>`,
+        () => `<span class="f-mute">[INFLUENCE] </span><span class="f-em">@${handles[hi % handles.length]}</span><span class="f-mute"> scored </span><span class="f-em">${Math.floor(Math.random()*50+30)}%</span><span class="f-mute"> influence</span>`,
+        () => `<span class="f-mute">[PATTERN] DOMINANT_PATTERN: </span><span class="f-em">${patterns[pi++ % patterns.length]}</span><span class="f-mute"> assigned to </span><span class="f-rust">@${handles[hi % handles.length]}</span>`,
+        () => `<span class="f-mute">[DECISION] </span><span class="f-em">@${handles[hi % handles.length]}</span><span class="f-mute"> authored DECISION_${String(di++).padStart(2,'0')}</span>`,
+        () => `<span class="f-mute">[DEBATE] </span><span class="f-em">@${handles[hi % handles.length]}</span><span class="f-mute"> opened debate thread PR #${pri++}</span>`,
+        () => `<span class="f-mute">[REJECTION] </span><span class="f-em">@${handles[hi % handles.length]}</span><span class="f-mute"> owns REJECTION_RECORD_${String(ri++).padStart(2,'0')}</span>`,
+        () => `<span class="f-mute">[MATCH] Heuristic overlap found between </span><span class="f-em">@${handles[0]}</span><span class="f-mute"> and </span><span class="f-em">@${handles[2]}</span>`,
+        () => `<span class="f-mute">[QUERY] Fetching authorship weight for PR-${pri}...</span>`,
+        () => `<span class="f-mute">[DECRYPT] Reasoning hashes validated for </span><span class="f-em">@${handles[hi % handles.length]}</span>`,
+      ];
+
+      let idx = 0;
+      setInterval(() => {
+        const line = document.createElement('div');
+        line.className = 'f-line';
+        line.innerHTML = pool[idx % pool.length]();
+        idx++;
+        body.appendChild(line);
+        body.scrollTop = body.scrollHeight;
+        while (body.children.length > 40) body.removeChild(body.firstChild);
+      }, 2000);
+    })();
+  </script>
+
+</body>
+</html>

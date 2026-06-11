@@ -1,0 +1,67 @@
+---
+---
+
+<div class="w-full max-w-xl mx-auto">
+  <form id="repo-form" class="flex flex-col gap-4">
+    <div class="flex gap-2">
+      <input
+        type="url"
+        id="repo-url"
+        placeholder="https://github.com/owner/repo"
+        class="flex-1 bg-[#0d1117] border border-gray-700 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+        required
+      />
+      <button
+        type="submit"
+        class="bg-cyan-600 hover:bg-cyan-500 text-white font-medium px-6 py-3 rounded-lg transition-colors"
+      >
+        Analyze
+      </button>
+    </div>
+
+    <div class="bg-[#0d1117] border border-gray-800 rounded-lg p-4">
+      <h3 class="text-sm font-medium text-gray-300 mb-3">API Keys (BYOK)</h3>
+      <div class="flex flex-col gap-3">
+        <input
+          type="password"
+          id="github-token"
+          placeholder="GitHub Personal Access Token"
+          class="bg-[#08090d] border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+        />
+        <input
+          type="password"
+          id="nim-key"
+          placeholder="NVIDIA NIM API Key"
+          class="bg-[#08090d] border border-gray-700 rounded px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500"
+        />
+      </div>
+      <p class="text-xs text-gray-500 mt-2">
+        Keys are sent as request headers and never stored.
+      </p>
+    </div>
+  </form>
+</div>
+
+<script>
+  document.getElementById('repo-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const urlInput = document.getElementById('repo-url');
+    const tokenInput = document.getElementById('github-token');
+    const nimInput = document.getElementById('nim-key');
+
+    const resp = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Github-Token': tokenInput?.value || '',
+        'X-Nim-Api-Key': nimInput?.value || '',
+      },
+      body: JSON.stringify({ repo_url: urlInput?.value }),
+    });
+
+    if (resp.ok) {
+      const data = await resp.json();
+      window.location.href = `/repo/${data.job_id}`;
+    }
+  });
+</script>

@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Karla:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+*, *::before, *::after {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  transition: none !important;
+  animation-duration: 0s !important;
+  text-shadow: none !important;
+  filter: none !important;
+}
+
+/* Allow scroll animation overrides */
+.byok-dot,
+.byok-path-core {
+  animation-duration: unset !important;
+  transition: none !important;
+}
+
+html, body {
+  background-color: #131313;
+  color: #e5e2e1;
+  font-family: 'Karla', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Reset outline on focus to keep border-only focus style */
+*:focus {
+  outline: none;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: #131313; }
+::-webkit-scrollbar-thumb { background: #262626; }

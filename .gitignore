@@ -1,0 +1,14 @@
+# Secrets — never commit these
+backend/Secrets.toml
+frontend/.env
+frontend/.env.local
+frontend/.env.production
+
+# Build artifacts
+frontend/dist/
+frontend/node_modules/
+backend/target/
+
+# OS
+.DS_Store
+Thumbs.db

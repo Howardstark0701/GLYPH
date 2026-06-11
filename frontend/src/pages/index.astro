@@ -1,0 +1,1015 @@
+---
+// GLYPH OS — Terminal Entry Screen
+// index.astro — Single-file landing page
+import '../styles/global.css';
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GLYPH_OS — v4.0.2-STABLE</title>
+  <!-- global.css imported via Astro frontmatter import, not a static link -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Base ─────────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #131313;
+      color: #e5e2e1;
+      font-family: 'Karla', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Typography helpers ───────────────────────────────── */
+    .font-mono  { font-family: 'JetBrains Mono', monospace; }
+    .font-display { font-family: 'Space Grotesk', sans-serif; }
+    .data-sm    { font-family: 'JetBrains Mono', monospace; font-size: 0.6875rem; line-height: 1rem; }
+    .label-caps { font-family: 'JetBrains Mono', monospace; font-size: 0.6875rem; letter-spacing: 0.1em; text-transform: uppercase; line-height: 1rem; }
+
+    /* ── Color tokens ─────────────────────────────────────── */
+    .bg-os      { background: #131313; }
+    .border-os  { border-color: #262626; }
+    .text-muted { color: #a1a1a1; }
+    .text-hero  { color: #ffb4a8; }
+    .text-red   { color: #cc0000; }
+    .text-rust  { color: #5e3f3a; }
+    .text-em    { color: #e5e2e1; }
+    .border-red { border-color: #cc0000; }
+
+    /* ── Shell chrome ─────────────────────────────────────── */
+    #navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 40px; /* leave room for rotated sidebar text */
+      height: 40px;
+      background: #131313;
+      border-bottom: 1px solid #262626;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      z-index: 100;
+    }
+
+    #statusbar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 40px;
+      height: 32px;
+      background: #131313;
+      border-top: 1px solid #262626;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      z-index: 100;
+    }
+
+    /* ── Vertical sidebar strip ───────────────────────────── */
+    #sidebar-strip {
+      position: fixed;
+      top: 0;
+      right: 0;
+      width: 40px;
+      bottom: 0;
+      background: #131313;
+      border-left: 1px solid #262626;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      z-index: 100;
+    }
+
+    .sidebar-text {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.5rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: #5e3f3a;
+      white-space: nowrap;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      transform: rotate(180deg);
+      user-select: none;
+    }
+
+    /* ── Icon buttons ─────────────────────────────────────── */
+    .icon-btn {
+      width: 24px;
+      height: 24px;
+      background: transparent;
+      border: 1px solid #262626;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #a1a1a1;
+      padding: 0;
+    }
+
+    .icon-btn:hover { border-color: #cc0000; color: #cc0000; }
+
+    /* ── Terminate button ─────────────────────────────────── */
+    #terminate-btn {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6875rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #cc0000;
+      background: transparent;
+      border: 1px solid #cc0000;
+      padding: 2px 10px;
+      cursor: pointer;
+      height: 22px;
+      line-height: 1;
+    }
+
+    #terminate-btn:hover { background: #cc0000; color: #131313; }
+
+    /* ── Main content area ────────────────────────────────── */
+    #main {
+      margin-top: 40px;
+      margin-bottom: 32px;
+      margin-right: 40px;
+      min-height: calc(100vh - 72px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ── Hero section ─────────────────────────────────────── */
+    #hero {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 80px;
+      padding-bottom: 48px;
+      width: 100%;
+    }
+
+    .hero-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 6rem;
+      line-height: 1;
+      color: #ffb4a8;
+      letter-spacing: -0.02em;
+      margin: 0;
+    }
+
+    .hero-sub {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6875rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #a1a1a1;
+      margin-top: 16px;
+    }
+
+    /* ── Input row ────────────────────────────────────────── */
+    #input-row {
+      display: flex;
+      align-items: stretch;
+      width: 100%;
+      max-width: 640px;
+      margin-top: 32px;
+      border: 1px solid #cc0000;
+    }
+
+    #input-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 0.75rem;
+      color: #cc0000;
+      background: #131313;
+      padding: 0 12px;
+      display: flex;
+      align-items: center;
+      border-right: 1px solid #cc0000;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    #repo-input {
+      flex: 1;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.75rem;
+      color: #e5e2e1;
+      background: #131313;
+      border: none;
+      padding: 0 12px;
+      height: 40px;
+      outline: none;
+      min-width: 0;
+    }
+
+    #repo-input::placeholder { color: #5e3f3a; }
+
+    #submit-btn {
+      width: 40px;
+      height: 40px;
+      background: #cc0000;
+      border: none;
+      border-left: 1px solid #cc0000;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    #submit-btn:hover { background: #ff0000; }
+
+    .submit-square {
+      width: 10px;
+      height: 10px;
+      background: #131313;
+    }
+
+    /* ── BYOK trace section ───────────────────────────────── */
+    #byok-section {
+      position: relative;
+      width: 100%;
+      max-width: 640px;
+      margin-top: 0;
+    }
+
+    #byok-scroll-container {
+      height: 2400px;
+      position: relative;
+    }
+
+    #byok-sticky {
+      position: sticky;
+      top: 40px;
+      height: calc(100vh - 72px);
+      display: flex;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    #byok-svg-wrap {
+      position: relative;
+      width: 320px;
+      height: 100%;
+    }
+
+    #byok-svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 600px;
+      overflow: visible;
+    }
+
+    /* ── Node cards ───────────────────────────────────────── */
+    .node-card {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 220px;
+      background: #131313;
+      border: 1px solid #262626;
+      padding: 10px 14px;
+      opacity: 0;
+    }
+
+    .node-card.visible { opacity: 1; }
+
+    .node-card-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+
+    .node-indicator {
+      width: 8px;
+      height: 8px;
+      flex-shrink: 0;
+    }
+
+    .node-indicator.solid   { background: #cc0000; border: 1px solid #cc0000; }
+    .node-indicator.hollow  { background: transparent; border: 1px solid #cc0000; }
+
+    .node-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      font-size: 0.6875rem;
+      color: #e5e2e1;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .node-sublabel {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      color: #a1a1a1;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding-left: 16px;
+    }
+
+    .node-dashed-line {
+      margin-top: 10px;
+      border-top: 1px dashed #cc0000;
+      opacity: 0.5;
+    }
+
+    /* ── Syslog panel ─────────────────────────────────────── */
+    #syslog {
+      position: fixed;
+      bottom: 44px;
+      left: 20px;
+      width: 280px;
+      background: #131313;
+      border: 1px solid #262626;
+      z-index: 50;
+    }
+
+    #syslog-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 10px;
+      border-bottom: 1px solid #262626;
+    }
+
+    .syslog-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #e5e2e1;
+    }
+
+    .syslog-status-chip {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.55rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #cc0000;
+      border: 1px solid #cc0000;
+      padding: 1px 6px;
+      background: transparent;
+    }
+
+    #syslog-body {
+      padding: 6px 10px;
+    }
+
+    .log-line {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      color: #a1a1a1;
+      line-height: 1.5;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .log-line .ts   { color: #5e3f3a; }
+    .log-line .ev   { color: #e5e2e1; }
+
+    /* ── Clock blink ──────────────────────────────────────── */
+    #clock { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #a1a1a1; }
+
+    /* ── BYOK key modal ───────────────────────────────────── */
+    #byok-modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 500;
+      align-items: center;
+      justify-content: center;
+    }
+    #byok-modal-backdrop.open { display: flex; }
+
+    #byok-modal {
+      width: 480px;
+      background: #131313;
+      border: 1px solid #262626;
+      padding: 0;
+    }
+
+    #byok-modal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      border-bottom: 1px solid #262626;
+      background: #0e0e0e;
+    }
+    #byok-modal-header .modal-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #cc0000;
+    }
+    #byok-modal-close {
+      background: transparent;
+      border: none;
+      color: #a1a1a1;
+      cursor: pointer;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      padding: 2px 6px;
+      border: 1px solid #262626;
+    }
+    #byok-modal-close:hover { border-color: #cc0000; color: #cc0000; }
+
+    #byok-modal-body { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+    .byok-field { display: flex; flex-direction: column; gap: 5px; }
+    .byok-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #a1a1a1;
+    }
+    .byok-hint {
+      font-family: 'Karla', sans-serif;
+      font-size: 0.75rem;
+      color: #5e3f3a;
+      margin-top: 2px;
+    }
+    .byok-input-row {
+      display: flex;
+      border: 1px solid #262626;
+    }
+    .byok-input-row input {
+      flex: 1;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: #e5e2e1;
+      background: #131313;
+      border: none;
+      padding: 7px 10px;
+      letter-spacing: 0.04em;
+    }
+    .byok-input-row input::placeholder { color: #3a3a3a; }
+    .byok-input-row input:focus { border: none; outline: none; }
+    .byok-input-row.filled { border-color: #cc0000; }
+
+    #byok-notice {
+      font-family: 'Karla', sans-serif;
+      font-size: 0.75rem;
+      color: #5e3f3a;
+      line-height: 1.5;
+      border-top: 1px solid #262626;
+      padding-top: 12px;
+    }
+
+    #byok-confirm-btn {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #ffffff;
+      background: #cc0000;
+      border: none;
+      padding: 9px 0;
+      cursor: pointer;
+      width: 100%;
+      text-align: center;
+    }
+    #byok-confirm-btn:hover { background: #ff0000; }
+    #byok-confirm-btn:disabled { background: #2a2a2a; color: #5e3f3a; cursor: not-allowed; }
+
+    /* Key indicator next to submit button */
+    #key-status {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #5e3f3a;
+      padding: 0 10px;
+      display: flex;
+      align-items: center;
+      border-left: 1px solid #262626;
+      cursor: pointer;
+      user-select: none;
+      white-space: nowrap;
+      margin-top: 12px;
+      align-self: flex-start;
+    }
+    #key-status.set { color: #cc0000; border-color: #cc0000; }
+    #key-status:hover { color: #cc0000; }
+  </style>
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════════
+       TOP NAVBAR
+  ════════════════════════════════════════════════════════════ -->
+  <nav id="navbar" aria-label="System navigation">
+    <!-- Left: brand -->
+    <div style="display:flex;align-items:baseline;gap:10px;">
+      <span style="font-family:'JetBrains Mono',monospace;font-weight:700;font-size:0.875rem;color:#e5e2e1;letter-spacing:0.06em;">
+        GLYPH_OS
+      </span>
+      <span class="data-sm text-muted" style="letter-spacing:0.06em;">v4.0.2-STABLE</span>
+    </div>
+
+    <!-- Right: clock + icon buttons -->
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span id="clock" aria-live="polite" aria-label="System clock">00:00:00.00</span>
+      <!-- Grid icon -->
+      <button class="icon-btn" aria-label="Grid view" title="Grid">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <rect x="0" y="0" width="5" height="5" fill="currentColor"/>
+          <rect x="7" y="0" width="5" height="5" fill="currentColor"/>
+          <rect x="0" y="7" width="5" height="5" fill="currentColor"/>
+          <rect x="7" y="7" width="5" height="5" fill="currentColor"/>
+        </svg>
+      </button>
+      <!-- Terminal icon -->
+      <button class="icon-btn" aria-label="Terminal" title="Terminal">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <polyline points="1,3 5,6 1,9" stroke="currentColor" stroke-width="1.2" fill="none"/>
+          <line x1="6" y1="9" x2="11" y2="9" stroke="currentColor" stroke-width="1.2"/>
+        </svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ═══════════════════════════════════════════════════════
+       RIGHT SIDEBAR STRIP
+  ════════════════════════════════════════════════════════════ -->
+  <aside id="sidebar-strip" aria-label="Station identification">
+    <span class="sidebar-text">STATION_ID: GLYPH-PRIME-04</span>
+    <span class="sidebar-text">ENCRYPTION: AES_256_GCM</span>
+  </aside>
+
+  <!-- ═══════════════════════════════════════════════════════
+       MAIN CONTENT
+  ════════════════════════════════════════════════════════════ -->
+  <main id="main">
+
+    <!-- ── Hero ─────────────────────────────────────────── -->
+    <section id="hero" aria-labelledby="hero-title">
+      <h1 class="hero-title" id="hero-title">GLYPH</h1>
+      <p class="hero-sub" aria-label="Repository uplink protocol">REPOSITORY_UPLINK_PROTOCOL</p>
+
+      <!-- Input row -->
+      <div id="input-row" role="search">
+        <label id="input-label" for="repo-input" aria-label="Repository URL uplink">UPLINK://</label>
+        <input
+          id="repo-input"
+          type="url"
+          placeholder="ENTER_REPOSITORY_URL..."
+          autocomplete="off"
+          autocorrect="off"
+          spellcheck="false"
+          aria-label="GitHub repository URL"
+          aria-describedby="input-label"
+        />
+        <button id="submit-btn" type="button" aria-label="Submit repository URL">
+          <span class="submit-square" aria-hidden="true"></span>
+        </button>
+      </div>
+
+      <!-- Key setup indicator -->
+      <button id="key-status" type="button" aria-label="Configure API keys">
+        KEYS: NOT_SET — CLICK TO CONFIGURE
+      </button>
+    </section>
+
+    <!-- ── BYOK Scroll Trace ─────────────────────────────── -->
+    <section id="byok-section" aria-label="Credential flow trace">
+      <div id="byok-scroll-container">
+        <div id="byok-sticky">
+          <div id="byok-svg-wrap">
+
+            <!-- SVG path trace -->
+            <svg id="byok-svg" viewBox="0 0 320 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+              <!-- Flat opaque base path (dimmed) -->
+              <path
+                id="byok-path-bg"
+                d="M 160,20 C 160,80 240,100 240,160 C 240,220 80,240 80,300 C 80,360 240,380 240,440 C 240,500 160,520 160,580"
+                fill="none"
+                stroke="#2a0000"
+                stroke-width="1.5"
+                stroke-linecap="square"
+              />
+              <!-- Core line — drawn progressively via dashoffset -->
+              <path
+                id="byok-path-core"
+                class="byok-path-core"
+                d="M 160,20 C 160,80 240,100 240,160 C 240,220 80,240 80,300 C 80,360 240,380 240,440 C 240,500 160,520 160,580"
+                fill="none"
+                stroke="#cc0000"
+                stroke-width="1.5"
+                stroke-linecap="square"
+              />
+              <!-- Moving dot (square) -->
+              <rect
+                id="byok-dot"
+                class="byok-dot"
+                x="156" y="16"
+                width="8" height="8"
+                fill="#cc0000"
+              />
+            </svg>
+
+            <!-- Node cards — positioned along path -->
+            <!-- Node 0: Origin / LOCAL_INIT -->
+            <div class="node-card" id="node-0" style="top:4px;" role="listitem">
+              <div class="node-card-header">
+                <span class="node-indicator solid" aria-hidden="true"></span>
+                <span class="node-label">Origin</span>
+              </div>
+              <span class="node-sublabel">LOCAL_INIT</span>
+            </div>
+
+            <!-- Node 1: UI Layer / KEYS_HELD -->
+            <div class="node-card" id="node-1" style="top:142px;" role="listitem">
+              <div class="node-card-header">
+                <span class="node-indicator hollow" aria-hidden="true"></span>
+                <span class="node-label">UI Layer</span>
+              </div>
+              <span class="node-sublabel">KEYS_HELD</span>
+            </div>
+
+            <!-- Node 2: Orchestrator / PENDING_END -->
+            <div class="node-card" id="node-2" style="top:282px;" role="listitem">
+              <div class="node-card-header">
+                <span class="node-indicator hollow" aria-hidden="true"></span>
+                <span class="node-label">Orchestrator</span>
+              </div>
+              <span class="node-sublabel">PENDING_END</span>
+            </div>
+
+            <!-- Node 3: Termination / AWAITING_AUTH -->
+            <div class="node-card" id="node-3" style="top:422px;" role="listitem">
+              <div class="node-card-header">
+                <span class="node-indicator hollow" aria-hidden="true"></span>
+                <span class="node-label">Termination</span>
+              </div>
+              <span class="node-sublabel">AWAITING_AUTH</span>
+            </div>
+
+            <!-- Node 4: Sub-Process / SUB_PROCESS -->
+            <div class="node-card" id="node-4" style="top:562px;" role="listitem">
+              <div class="node-card-header">
+                <span class="node-indicator hollow" aria-hidden="true"></span>
+                <span class="node-label">Sub-Process</span>
+              </div>
+              <span class="node-sublabel">SUB_PROCESS</span>
+              <div class="node-dashed-line" aria-hidden="true"></div>
+            </div>
+
+          </div><!-- /byok-svg-wrap -->
+        </div><!-- /byok-sticky -->
+      </div><!-- /byok-scroll-container -->
+    </section>
+
+  </main>
+
+  <!-- ═══════════════════════════════════════════════════════
+       BYOK KEY MODAL
+  ════════════════════════════════════════════════════════════ -->
+  <div id="byok-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="byok-modal-title">
+    <div id="byok-modal">
+      <div id="byok-modal-header">
+        <span class="modal-title" id="byok-modal-title">CREDENTIAL_SETUP // BYOK</span>
+        <button id="byok-modal-close" type="button" aria-label="Close credential setup">✕ CLOSE</button>
+      </div>
+      <div id="byok-modal-body">
+
+        <div class="byok-field">
+          <span class="byok-label">GitHub Personal Access Token</span>
+          <span class="byok-hint">github.com → Settings → Developer Settings → PAT (Classic) → repo scope</span>
+          <div class="byok-input-row" id="gh-row">
+            <input
+              id="gh-token-input"
+              type="password"
+              placeholder="ghp_..."
+              autocomplete="off"
+              spellcheck="false"
+              aria-label="GitHub Personal Access Token"
+            />
+          </div>
+        </div>
+
+        <div class="byok-field">
+          <span class="byok-label">NVIDIA NIM API Key</span>
+          <span class="byok-hint">build.nvidia.com → Get API Key</span>
+          <div class="byok-input-row" id="nim-row">
+            <input
+              id="nim-key-input"
+              type="password"
+              placeholder="nvapi-..."
+              autocomplete="off"
+              spellcheck="false"
+              aria-label="NVIDIA NIM API Key"
+            />
+          </div>
+        </div>
+
+        <p id="byok-notice">
+          Keys are held in session memory only. Never written to disk, never sent to GLYPH servers.
+          They travel as request headers directly to GitHub and NVIDIA NIM. Cleared on page refresh.
+        </p>
+
+        <button id="byok-confirm-btn" type="button" disabled aria-label="Confirm and save keys">
+          CONFIRM_KEYS
+        </button>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       SYSLOG PANEL
+  ════════════════════════════════════════════════════════════ -->
+  <aside id="syslog" aria-label="System log daemon" aria-live="polite">
+    <div id="syslog-header">
+      <span class="syslog-title">SYSLOG_DAEMON</span>
+      <span class="syslog-status-chip" role="status">ACTIVE</span>
+    </div>
+    <div id="syslog-body" role="log" aria-label="System log entries">
+      <div class="log-line"><span class="ts">[00:00:00.01]</span> <span class="ev">KERNEL_BOOT</span> <span class="text-muted">init stage 1</span></div>
+      <div class="log-line"><span class="ts">[00:00:00.04]</span> <span class="ev">NET_INTERFACE</span> <span class="text-muted">uplink ready</span></div>
+      <div class="log-line"><span class="ts">[00:00:00.09]</span> <span class="ev">DB_POOL_INIT</span> <span class="text-muted">connections: 8</span></div>
+      <div class="log-line"><span class="ts">[00:00:00.12]</span> <span class="ev">AUTH_MODULE</span> <span class="text-muted">keys: none held</span></div>
+      <div class="log-line"><span class="ts">[00:00:00.18]</span> <span class="ev">SYSTEM_STABLE</span> <span class="text-muted">latency nominal</span></div>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════════════════════════════════
+       BOTTOM STATUS BAR
+  ════════════════════════════════════════════════════════════ -->
+  <footer id="statusbar" aria-label="System status bar">
+    <!-- Left: status indicators -->
+    <div class="data-sm text-muted" style="display:flex;align-items:center;gap:8px;">
+      <span style="color:#e5e2e1;">SYSTEM_STABLE</span>
+      <span aria-hidden="true">·</span>
+      <span>LATENCY: <span id="latency-val">12ms</span></span>
+    </div>
+    <!-- Right: UTC timestamp + terminate -->
+    <div style="display:flex;align-items:center;gap:12px;">
+      <span id="utc-clock" class="data-sm text-muted" aria-label="UTC timestamp" aria-live="polite">UTC 00:00:00</span>
+      <button id="terminate-btn" type="button" aria-label="Terminate current session">
+        TERMINATE_SESSION
+      </button>
+    </div>
+  </footer>
+
+  <!-- ═══════════════════════════════════════════════════════
+       SCRIPTS
+  ════════════════════════════════════════════════════════════ -->
+  <script>
+    // ── API base URL ──────────────────────────────────────
+    const API_BASE = (import.meta as any).env?.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+
+    // ── Session key store (memory only, backed by sessionStorage) ─
+    const keys = {
+      github: sessionStorage.getItem('glyph_gh_token') ?? '',
+      nim:    sessionStorage.getItem('glyph_nim_key')  ?? '',
+    };
+
+    function keysSet(): boolean {
+      return keys.github.length > 0 && keys.nim.length > 0;
+    }
+
+    // ── BYOK modal ────────────────────────────────────────
+    (function initByokModal() {
+      const backdrop   = document.getElementById('byok-modal-backdrop')!;
+      const closeBtn   = document.getElementById('byok-modal-close')!;
+      const ghInput    = document.getElementById('gh-token-input') as HTMLInputElement;
+      const nimInput   = document.getElementById('nim-key-input')  as HTMLInputElement;
+      const confirmBtn = document.getElementById('byok-confirm-btn') as HTMLButtonElement;
+      const ghRow      = document.getElementById('gh-row')!;
+      const nimRow     = document.getElementById('nim-row')!;
+      const keyStatus  = document.getElementById('key-status')!;
+
+      // Restore indicator if keys already set from a previous session
+      if (keysSet()) {
+        keyStatus.textContent = 'KEYS: SET ✓';
+        keyStatus.classList.add('set');
+      }
+
+      function openModal() { backdrop.classList.add('open'); ghInput.focus(); }
+      function closeModal() { backdrop.classList.remove('open'); }
+
+      keyStatus.addEventListener('click', openModal);
+      closeBtn.addEventListener('click',  closeModal);
+      backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop) closeModal();
+      });
+
+      function checkInputs() {
+        const ghOk  = ghInput.value.trim().length > 0;
+        const nimOk = nimInput.value.trim().length > 0;
+        ghRow.classList.toggle('filled', ghOk);
+        nimRow.classList.toggle('filled', nimOk);
+        confirmBtn.disabled = !(ghOk && nimOk);
+      }
+
+      ghInput.addEventListener('input',  checkInputs);
+      nimInput.addEventListener('input', checkInputs);
+
+      confirmBtn.addEventListener('click', () => {
+        keys.github = ghInput.value.trim();
+        keys.nim    = nimInput.value.trim();
+        // Persist to sessionStorage so keys survive page navigation
+        sessionStorage.setItem('glyph_gh_token', keys.github);
+        sessionStorage.setItem('glyph_nim_key',  keys.nim);
+        keyStatus.textContent = 'KEYS: SET ✓';
+        keyStatus.classList.add('set');
+        closeModal();
+      });
+    })();
+
+    // ── Live clock ────────────────────────────────────────
+    (function initClock() {
+      const clockEl  = document.getElementById('clock')!;
+      const utcEl    = document.getElementById('utc-clock')!;
+      const startTime = Date.now();
+
+      function pad2(n: number): string { return String(n).padStart(2, '0'); }
+
+      function tick() {
+        const elapsed = Date.now() - startTime;
+        const s  = Math.floor(elapsed / 1000);
+        const ms = Math.floor((elapsed % 1000) / 10);
+        const m  = Math.floor(s / 60);
+        const h  = Math.floor(m / 60);
+        clockEl.textContent = `${pad2(h % 24)}:${pad2(m % 60)}:${pad2(s % 60)}.${pad2(ms)}`;
+
+        const now = new Date();
+        utcEl.textContent = `UTC ${pad2(now.getUTCHours())}:${pad2(now.getUTCMinutes())}:${pad2(now.getUTCSeconds())}`;
+
+        requestAnimationFrame(tick);
+      }
+      tick();
+    })();
+
+    // ── Syslog live append ────────────────────────────────
+    (function initSyslog() {
+      const body = document.getElementById('syslog-body')!;
+      const events: string[] = [
+        'REPO_SCAN_INIT', 'UPLINK_OPEN', 'PARSE_MANIFEST',
+        'COMMIT_INDEX_START', 'NIM_HANDSHAKE', 'GRAPH_BUILD',
+        'INTENT_EXTRACT', 'CACHE_WRITE', 'SIGNAL_READY',
+      ];
+      let idx = 0;
+      const startMs = Date.now();
+
+      setInterval(() => {
+        const elapsed = Date.now() - startMs;
+        const s  = Math.floor(elapsed / 1000);
+        const ms = Math.floor((elapsed % 1000) / 10);
+        const pad = (n: number, d: number) => String(n).padStart(d, '0');
+        const ts  = `[${pad(0,2)}:${pad(0,2)}:${pad(s,2)}.${pad(ms,2)}]`;
+        const ev  = events[idx % events.length];
+        idx++;
+
+        const line = document.createElement('div');
+        line.className = 'log-line';
+        line.innerHTML = `<span class="ts">${ts}</span> <span class="ev">${ev}</span>`;
+        body.appendChild(line);
+        while (body.children.length > 7) body.removeChild(body.firstChild!);
+      }, 2400);
+    })();
+
+    // ── BYOK scroll trace ─────────────────────────────────
+    (function initByokTrace() {
+      const pathEl    = document.getElementById('byok-path-core') as SVGPathElement | null;
+      const dotEl     = document.getElementById('byok-dot') as SVGRectElement | null;
+      const container = document.getElementById('byok-scroll-container') as HTMLElement | null;
+      const sticky    = document.getElementById('byok-sticky') as HTMLElement | null;
+
+      if (!pathEl || !dotEl || !container || !sticky) return;
+
+      const totalLen = pathEl.getTotalLength();
+      pathEl.style.strokeDasharray  = String(totalLen);
+      pathEl.style.strokeDashoffset = String(totalLen);
+
+      const nodes: { id: string; threshold: number }[] = [
+        { id: 'node-0', threshold: 0.00 },
+        { id: 'node-1', threshold: 0.22 },
+        { id: 'node-2', threshold: 0.44 },
+        { id: 'node-3', threshold: 0.66 },
+        { id: 'node-4', threshold: 0.88 },
+      ];
+
+      function onScroll() {
+        const containerTop = container!.getBoundingClientRect().top;
+        const scrollHeight = container!.offsetHeight - sticky!.offsetHeight;
+        const progress     = Math.max(0, Math.min(1, -containerTop / scrollHeight));
+
+        pathEl!.style.strokeDashoffset = String(totalLen * (1 - progress));
+
+        const pt = pathEl!.getPointAtLength(totalLen * progress);
+        dotEl!.setAttribute('x', String(pt.x - 4));
+        dotEl!.setAttribute('y', String(pt.y - 4));
+
+        for (const node of nodes) {
+          const el = document.getElementById(node.id);
+          if (!el) continue;
+          el.classList.toggle('visible', progress >= node.threshold);
+        }
+      }
+
+      window.addEventListener('scroll', onScroll, { passive: true });
+      onScroll();
+    })();
+
+    // ── Repo input submit — calls POST /api/analyze ───────
+    (function initInput() {
+      const input    = document.getElementById('repo-input')    as HTMLInputElement;
+      const btn      = document.getElementById('submit-btn')    as HTMLButtonElement;
+      const keyStatus = document.getElementById('key-status')   as HTMLButtonElement;
+      const submitSq  = btn.querySelector('.submit-square')     as HTMLSpanElement;
+
+      async function submit() {
+        const url = input.value.trim();
+        if (!url) return;
+
+        // Gate: require keys
+        if (!keysSet()) {
+          keyStatus.click(); // open BYOK modal
+          return;
+        }
+
+        // Visual feedback
+        submitSq.style.background = '#ff0000';
+        btn.disabled = true;
+        input.disabled = true;
+
+        try {
+          const resp = await fetch(`${API_BASE}/api/analyze`, {
+            method:  'POST',
+            headers: {
+              'Content-Type':  'application/json',
+              'X-Github-Token': keys.github,
+              'X-Nim-Api-Key':  keys.nim,
+            },
+            body: JSON.stringify({ repo_url: url }),
+          });
+
+          if (!resp.ok) {
+            const err = await resp.json().catch(() => ({ error: 'Unknown error' }));
+            throw new Error(err.error ?? `HTTP ${resp.status}`);
+          }
+
+          const data = await resp.json();
+          // Navigate to dashboard with the job_id
+          window.location.href = `/repo/${encodeURIComponent(data.job_id)}`;
+        } catch (err: any) {
+          // Show error in syslog
+          const body = document.getElementById('syslog-body')!;
+          const line = document.createElement('div');
+          line.className = 'log-line';
+          line.innerHTML = `<span class="ts" style="color:#cc0000;">[ERROR]</span> <span class="ev" style="color:#cc0000;">${err.message}</span>`;
+          body.appendChild(line);
+          while (body.children.length > 7) body.removeChild(body.firstChild!);
+
+          // Reset button
+          submitSq.style.background = '#131313';
+          btn.disabled  = false;
+          input.disabled = false;
+        }
+      }
+
+      btn.addEventListener('click', submit);
+      input.addEventListener('keydown', (e: KeyboardEvent) => {
+        if (e.key === 'Enter') submit();
+      });
+    })();
+
+    // ── Terminate session ─────────────────────────────────
+    (function initTerminate() {
+      const btn = document.getElementById('terminate-btn') as HTMLButtonElement;
+      btn.addEventListener('click', () => {
+        sessionStorage.clear();
+        window.location.reload();
+      });
+    })();
+  </script>
+
+</body>
+</html>

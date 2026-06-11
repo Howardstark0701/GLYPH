@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: glyph-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: glyph-db
+          property: connectionString
+      - key: FRONTEND_URL
+        value: https://your-project.vercel.app   # update after Vercel deploy
+      - key: RUST_LOG
+        value: glyph=info,tower_http=info
+      - key: NIM_BASE_URL
+        value: https://integrate.api.nvidia.com/v1
+
+databases:
+  - name: glyph-db
+    plan: free
+    databaseName: glyph

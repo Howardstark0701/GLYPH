@@ -1,0 +1,883 @@
+---
+// GLYPH OS — Repository Intelligence Summary
+// src/pages/repo/[id]/summary.astro
+
+const { id } = Astro.params;
+
+let repoOwner = 'unknown';
+let repoName  = 'unknown';
+try {
+  const decoded = decodeURIComponent(id ?? '');
+  const match   = decoded.match(/github\.com\/([^\/]+)\/([^\/\s]+)/);
+  if (match) {
+    repoOwner = match[1];
+    repoName  = match[2].replace(/\.git$/, '');
+  } else {
+    const parts = decoded.split('/').filter(Boolean);
+    if (parts.length >= 2) { repoOwner = parts[0]; repoName = parts[1]; }
+    else if (parts.length === 1) { repoName = parts[0]; }
+  }
+} catch (_) {}
+
+const repoSlug  = `${repoOwner}/${repoName}`;
+const analysisId = 'REQ-99X-ALPHA-01';
+const generatedDate = new Date().toISOString().split('T')[0];
+
+// ── Static seed narrative (replaced by GET /repo/:id/summary) ──
+interface NarrativeSection {
+  num:   string;
+  key:   string;
+  label: string;
+  body:  string[];
+}
+
+const sections: NarrativeSection[] = [
+  {
+    num:   '01',
+    key:   'origin_and_intent',
+    label: 'ORIGIN_AND_INTENT',
+    body: [
+      'Initial discovery of the core-engine repository suggests a high-stakes pivot toward decentralized node management during the late Q4 cycle. Intelligence reveals that the primary architect, known as "O-Zero", intended to bypass standard governance protocols to ensure maximum throughput in the latent environment.',
+      'The underlying code structures reflect an aggressive posture toward external dependencies. Over 40% of the initial commit history was purged following the internal audit of November 12th, indicating a calculated effort to conceal the original consensus mechanism\'s origins.',
+    ],
+  },
+  {
+    num:   '02',
+    key:   'architectural_evolution',
+    label: 'ARCHITECTURAL_EVOLUTION',
+    body: [
+      'Structural analysis indicates a transition from monolithic dispatching to a highly fragmented micro-kernel approach. This evolution coincides exactly with the emergence of the "Red Border" protocol, which enforced strict isolation between critical execution threads and non-essential logging systems.',
+      'During the integration phase, telemetry suggests that multiple race conditions were intentionally left unresolved as "stochastic triggers." These triggers appear to serve as an unconventional form of entropy injection, possibly for cryptographic seed generation within the kernel\'s hardened zone.',
+    ],
+  },
+  {
+    num:   '03',
+    key:   'key_decisions',
+    label: 'KEY_DECISIONS',
+    body: [
+      'Three high-confidence decision nodes emerged from the commit record. The adoption of Axum as the web framework was uncontested — a single-author commit with no debate thread. The PostgreSQL-over-SQLite choice generated the project\'s highest contention index, resolved only after a stress test revealed lock contention at scale.',
+      'The BYOK credential model was the only decision unanimously ratified across all contributors. No rejection records exist for this node — a rare signal of full architectural consensus.',
+    ],
+  },
+  {
+    num:   '04',
+    key:   'debate_record',
+    label: 'DEBATE_RECORD',
+    body: [
+      'Seven debate clusters were identified across pull request threads. The most sustained conflict centered on the async runtime selection: Tokio vs async-std. The thread ran 34 comments over 11 days before benchmark data resolved the impasse in favor of Tokio.',
+      'A secondary dispute over ORM selection — SQLx vs Diesel — revealed a recurring pattern: arch_priya consistently frames arguments in terms of compile-time guarantees, while dev_soren anchors on runtime maintenance cost. This divergence appears in four separate debate threads.',
+    ],
+  },
+  {
+    num:   '05',
+    key:   'rejection_vault',
+    label: 'REJECTION_VAULT',
+    body: [
+      'Five rejection records were sealed. The most significant: a full GraphQL migration layer was proposed in March and abandoned within 48 hours — no debate, direct veto from arch_priya citing schema rigidity concerns. The WebSocket realtime feed was similarly rejected, flagged as premature optimization at the current scale.',
+      'The contributor scoring module (ABANDONED_FEATURE_012) remains the only rejection with an unresolved debate thread. The feature was killed for insufficient commit evidence but the underlying argument — whether automated scoring produces meaningful signal — was never formally closed.',
+    ],
+  },
+];
+
+const stats = { decisions: 12, debates: 7, rejections: 5 };
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GLYPH — Intelligence Summary — {repoSlug}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset ───────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+      transition: none !important;
+      outline: none;
+    }
+    html, body {
+      margin: 0; padding: 0;
+      background: #131313;
+      color: #e5e2e1;
+      font-family: 'Karla', sans-serif;
+      height: 100%; overflow: hidden;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── Type ─────────────────────────────────────────────── */
+    .data-sm    { font-family:'JetBrains Mono',monospace; font-size:0.6875rem; line-height:1.2; }
+    .label-caps { font-family:'JetBrains Mono',monospace; font-size:0.625rem; letter-spacing:0.1em; text-transform:uppercase; line-height:1; }
+
+    /* ══════════════════════════════════════════════════════
+       NAVBAR — 44px
+    ══════════════════════════════════════════════════════ */
+    #navbar {
+      position: fixed; top:0; left:0; right:0; height:44px;
+      background:#131313; border-bottom:1px solid #1a1a1a;
+      display:grid; grid-template-columns:160px 1fr auto auto;
+      align-items:center; z-index:200;
+    }
+    #nav-brand {
+      padding:0 14px; display:flex; align-items:center;
+      border-right:1px solid #1a1a1a; height:100%;
+    }
+    #nav-brand a {
+      font-family:'Space Grotesk',sans-serif; font-weight:700;
+      font-size:1rem; color:#ffb4a8; text-decoration:none; letter-spacing:-0.01em;
+    }
+    #nav-brand .ver {
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      color:#cc0000; letter-spacing:0.06em; margin-left:8px;
+      border:1px solid #cc0000; padding:1px 5px;
+    }
+    /* Search */
+    #nav-search {
+      display:flex; align-items:center;
+      border:1px solid #1a1a1a; height:28px; margin:0 20px;
+      max-width:440px;
+    }
+    #nav-search svg { margin:0 8px; flex-shrink:0; color:#3a3a3a; }
+    #nav-search input {
+      flex:1; background:transparent; border:none;
+      font-family:'JetBrains Mono',monospace; font-size:0.6rem;
+      color:#e5e2e1; letter-spacing:0.06em; padding-right:8px;
+    }
+    #nav-search input::placeholder { color:#3a3a3a; }
+    /* Right icons */
+    #nav-icons { display:flex; align-items:center; gap:6px; padding:0 8px; }
+    .nav-icon-btn {
+      width:28px; height:28px; background:transparent;
+      border:1px solid #1a1a1a; cursor:pointer;
+      display:flex; align-items:center; justify-content:center;
+      color:#a1a1a1; padding:0;
+    }
+    .nav-icon-btn:hover { border-color:#cc0000; color:#cc0000; }
+    /* User chip */
+    #nav-user {
+      display:flex; align-items:center; gap:8px;
+      padding:0 14px; border-left:1px solid #1a1a1a; height:100%;
+    }
+    .nav-user-label {
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      letter-spacing:0.06em; text-transform:uppercase; color:#a1a1a1;
+      text-align:right; line-height:1.3;
+    }
+    .nav-user-label span { display:block; color:#cc0000; }
+    .nav-avatar {
+      width:24px; height:24px; background:#cc0000;
+      display:flex; align-items:center; justify-content:center;
+    }
+    .nav-avatar svg { color:#131313; }
+
+    /* ══════════════════════════════════════════════════════
+       LAYOUT
+    ══════════════════════════════════════════════════════ */
+    #layout {
+      position:fixed; top:44px; left:0; right:0; bottom:0; display:flex;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       SIDEBAR — 160px
+    ══════════════════════════════════════════════════════ */
+    #sidebar {
+      width:160px; flex-shrink:0;
+      background:#131313; border-right:1px solid #1a1a1a;
+      display:flex; flex-direction:column; overflow:hidden;
+    }
+    /* Operator badge */
+    #op-badge {
+      padding:12px 14px 10px; border-bottom:1px solid #1a1a1a;
+    }
+    .op-label {
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      letter-spacing:0.1em; text-transform:uppercase; color:#a1a1a1;
+      display:block; margin-bottom:2px;
+    }
+    .op-level {
+      font-family:'Space Grotesk',sans-serif; font-weight:700;
+      font-size:1.5rem; color:#e5e2e1; line-height:1;
+    }
+
+    .sidebar-nav { flex:1; display:flex; flex-direction:column; padding-top:4px; }
+    .nav-item {
+      display:flex; align-items:center; gap:8px; padding:8px 14px;
+      font-family:'JetBrains Mono',monospace; font-size:0.6rem;
+      letter-spacing:0.12em; text-transform:uppercase;
+      color:#a1a1a1; cursor:pointer; user-select:none;
+      border:none; border-left:2px solid transparent;
+      background:transparent; width:100%; text-align:left; text-decoration:none;
+    }
+    .nav-item:hover:not(.active) { color:#e5e2e1; background:#1a1a1a; }
+    .nav-item.active { border-left-color:#cc0000; color:#cc0000; font-weight:700; }
+
+    /* Section group divider */
+    .nav-divider { height:1px; background:#1a1a1a; margin:6px 0; }
+
+    .sidebar-spacer { flex:1; }
+    .nav-item-util { color:#5e3f3a; }
+    .nav-item-util:hover { color:#cc0000; background:transparent; }
+
+    /* ══════════════════════════════════════════════════════
+       MAIN AREA
+    ══════════════════════════════════════════════════════ */
+    #main-area {
+      flex:1; display:flex; flex-direction:column; overflow:hidden; min-width:0;
+    }
+
+    /* ── Page header ─────────────────────────────────────── */
+    #page-header {
+      padding:12px 20px 14px; border-bottom:1px solid #1a1a1a; flex-shrink:0;
+    }
+    .breadcrumb-row {
+      display:flex; align-items:center; gap:8px; margin-bottom:6px;
+    }
+    .bc-report {
+      font-family:'JetBrains Mono',monospace; font-size:0.6rem;
+      letter-spacing:0.12em; text-transform:uppercase; color:#cc0000;
+    }
+    .bc-sep { color:#3a3a3a; font-size:0.75rem; margin:0 2px; }
+    .bc-repo {
+      font-family:'JetBrains Mono',monospace; font-size:0.6rem;
+      letter-spacing:0.06em; color:#a1a1a1;
+    }
+    .page-title {
+      font-family:'Space Grotesk',sans-serif; font-weight:700;
+      font-size:1.9rem; color:#ffb4a8; line-height:1; margin:0;
+      letter-spacing:-0.02em; text-transform:uppercase;
+    }
+
+    /* ── Metadata strip ──────────────────────────────────── */
+    #meta-strip {
+      display:grid; grid-template-columns:repeat(4,1fr);
+      border:1px solid #1a1a1a; background:#0e0e0e; flex-shrink:0;
+    }
+    .meta-cell {
+      padding:10px 16px; border-right:1px solid #1a1a1a;
+    }
+    .meta-cell:last-child { border-right:none; }
+    .meta-label {
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      letter-spacing:0.1em; text-transform:uppercase; color:#a1a1a1;
+      display:block; margin-bottom:4px;
+    }
+    .meta-value {
+      font-family:'JetBrains Mono',monospace; font-weight:700;
+      font-size:0.875rem; color:#e5e2e1; line-height:1;
+    }
+    .meta-value.accent { color:#cc0000; }
+
+    /* ── Content area ────────────────────────────────────── */
+    #content-area {
+      flex:1; display:grid;
+      grid-template-columns:1fr 220px;
+      grid-template-rows:1fr 120px;
+      overflow:hidden; min-height:0;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       NARRATIVE DOCUMENT — left col, scrollable
+    ══════════════════════════════════════════════════════ */
+    #narrative-col {
+      grid-column:1; grid-row:1;
+      border-right:1px solid #1a1a1a;
+      overflow-y:auto; padding:0;
+    }
+    #narrative-col::-webkit-scrollbar { width:3px; }
+    #narrative-col::-webkit-scrollbar-track { background:#131313; }
+    #narrative-col::-webkit-scrollbar-thumb { background:#1a1a1a; }
+
+    .narrative-section { padding:20px 24px 8px; }
+    .narrative-section + .narrative-section { padding-top:16px; }
+
+    .section-header {
+      display:flex; align-items:center; gap:0;
+      border-left:2px solid #cc0000;
+      padding-left:10px; margin-bottom:14px;
+    }
+    .section-num {
+      font-family:'JetBrains Mono',monospace; font-size:0.6rem;
+      letter-spacing:0.1em; color:#5e3f3a; margin-right:8px;
+    }
+    .section-label {
+      font-family:'JetBrains Mono',monospace; font-size:0.6rem;
+      letter-spacing:0.12em; text-transform:uppercase; color:#cc0000;
+    }
+
+    .section-para {
+      font-family:'Karla',sans-serif; font-size:0.875rem;
+      color:#a1a1a1; line-height:1.7; margin:0 0 12px;
+      max-width:680px;
+    }
+    .section-para:last-child { margin-bottom:0; }
+    /* First words of each paragraph highlighted */
+    .section-para .lead { color:#e5e2e1; }
+
+    /* Section divider (between sections) */
+    .section-sep { height:1px; background:#1a1a1a; margin:4px 24px; }
+
+    /* ══════════════════════════════════════════════════════
+       RIGHT CONTROL PANEL
+    ══════════════════════════════════════════════════════ */
+    #ctrl-panel {
+      grid-column:2; grid-row:1;
+      border-bottom:1px solid #1a1a1a;
+      background:#131313; overflow-y:auto;
+      display:flex; flex-direction:column;
+    }
+    #ctrl-panel::-webkit-scrollbar { width:3px; }
+    #ctrl-panel::-webkit-scrollbar-track { background:#131313; }
+    #ctrl-panel::-webkit-scrollbar-thumb { background:#1a1a1a; }
+
+    .cp-section { padding:12px 14px; border-bottom:1px solid #1a1a1a; }
+    .cp-section:last-child { border-bottom:none; }
+    .cp-label {
+      font-family:'JetBrains Mono',monospace; font-size:0.6rem;
+      letter-spacing:0.12em; text-transform:uppercase; color:#a1a1a1;
+      display:block; margin-bottom:10px;
+    }
+
+    /* Report status rows */
+    .status-row {
+      display:flex; align-items:center; justify-content:space-between;
+      margin-bottom:8px;
+    }
+    .status-row:last-child { margin-bottom:0; }
+    .status-key {
+      font-family:'JetBrains Mono',monospace; font-size:0.6rem;
+      letter-spacing:0.08em; text-transform:uppercase; color:#a1a1a1;
+    }
+    .status-val {
+      font-family:'JetBrains Mono',monospace; font-weight:700;
+      font-size:0.75rem; color:#e5e2e1;
+    }
+    /* Integrity bar */
+    .integrity-bar-wrap { margin-top:3px; }
+    .integrity-bar-track { width:100%; height:2px; background:#1a1a1a; margin-bottom:6px; }
+    .integrity-bar-fill  { height:2px; background:#cc0000; }
+
+    /* Section index */
+    .index-item {
+      display:flex; align-items:center; gap:8px;
+      padding:6px 0; cursor:pointer;
+      border-left:2px solid transparent;
+    }
+    .index-item:hover { border-left-color:#cc0000; padding-left:6px; }
+    .index-num {
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      color:#5e3f3a; width:16px; flex-shrink:0;
+    }
+    .index-name {
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      letter-spacing:0.08em; text-transform:uppercase; color:#a1a1a1;
+    }
+    .index-item:hover .index-name { color:#e5e2e1; }
+
+    /* Regenerate button */
+    #regen-btn {
+      width:100%; background:#cc0000; border:none;
+      font-family:'JetBrains Mono',monospace; font-size:0.6rem;
+      letter-spacing:0.12em; text-transform:uppercase;
+      color:#fff; padding:10px 0; cursor:pointer;
+      display:flex; align-items:center; justify-content:center; gap:8px;
+    }
+    #regen-btn:hover { background:#ff0000; }
+    #regen-btn:disabled { background:#2a0000; color:#5e3f3a; cursor:not-allowed; }
+
+    /* Export buttons */
+    .export-row { display:grid; grid-template-columns:1fr 1fr; gap:6px; margin-top:8px; }
+    .export-btn {
+      background:transparent; border:1px solid #1a1a1a;
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      letter-spacing:0.1em; text-transform:uppercase;
+      color:#a1a1a1; padding:7px 0; cursor:pointer; text-align:center;
+    }
+    .export-btn:hover { border-color:#cc0000; color:#cc0000; }
+
+    /* ══════════════════════════════════════════════════════
+       GENERATION LOG — bottom full-width
+    ══════════════════════════════════════════════════════ */
+    #gen-log {
+      grid-column:1/3; grid-row:2;
+      display:flex; flex-direction:column;
+      background:#0e0e0e; overflow:hidden;
+    }
+    #gen-log-header {
+      padding:5px 14px; border-bottom:1px solid #1a1a1a;
+      background:#131313; flex-shrink:0;
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    .gen-header-left {
+      display:flex; align-items:center; gap:6px;
+      font-family:'JetBrains Mono',monospace; font-size:0.6rem;
+      letter-spacing:0.1em; text-transform:uppercase; color:#e5e2e1;
+    }
+    .gen-sq { width:6px; height:6px; background:#cc0000; flex-shrink:0; }
+    .gen-sep { color:#5e3f3a; margin:0 2px; }
+    .gen-header-right {
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      color:#5e3f3a; letter-spacing:0.06em;
+    }
+    #gen-log-body {
+      flex:1; overflow-y:auto; padding:6px 14px;
+      display:flex; flex-direction:column;
+    }
+    #gen-log-body::-webkit-scrollbar { width:3px; }
+    #gen-log-body::-webkit-scrollbar-track { background:#0e0e0e; }
+    #gen-log-body::-webkit-scrollbar-thumb { background:#1a1a1a; }
+    .g-line {
+      font-family:'JetBrains Mono',monospace; font-size:0.6rem;
+      line-height:1.65; white-space:nowrap; color:#a1a1a1; letter-spacing:0.04em;
+    }
+    .g-prefix  { color:#5e3f3a; }
+    .g-tag-info  { color:#a1a1a1; }
+    .g-tag-warn  { color:#cc0000; font-weight:700; }
+    .g-em        { color:#e5e2e1; }
+    /* Bottom-right timestamp watermark */
+    #log-timestamp {
+      position:absolute; bottom:6px; right:14px;
+      font-family:'JetBrains Mono',monospace; font-size:0.5rem;
+      color:#3a3a3a; letter-spacing:0.06em; pointer-events:none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ════════════════════════════════════════════════════════
+       NAVBAR
+  ═════════════════════════════════════════════════════════ -->
+  <nav id="navbar" aria-label="System navigation">
+    <div id="nav-brand">
+      <a href="/" aria-label="GLYPH home">GLYPH</a>
+      <span class="ver">v4.0.2-STABLE</span>
+    </div>
+
+    <div id="nav-search" role="search">
+      <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+        <circle cx="4.5" cy="4.5" r="3.5" stroke="currentColor" stroke-width="1"/>
+        <line x1="7.5" y1="7.5" x2="10" y2="10" stroke="currentColor" stroke-width="1"/>
+      </svg>
+      <input type="search" placeholder="SEARCH_REPOSITORY_INDEX..." autocomplete="off" spellcheck="false" aria-label="Search repository index" />
+    </div>
+
+    <div id="nav-icons">
+      <!-- Settings -->
+      <button class="nav-icon-btn" aria-label="Settings">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+          <circle cx="6.5" cy="6.5" r="2" stroke="currentColor" stroke-width="1"/>
+          <path d="M6.5 1v1.5M6.5 10.5V12M1 6.5h1.5M10.5 6.5H12M2.6 2.6l1.1 1.1M9.3 9.3l1.1 1.1M2.6 10.4l1.1-1.1M9.3 3.7l1.1-1.1" stroke="currentColor" stroke-width="1"/>
+        </svg>
+      </button>
+      <!-- Grid -->
+      <button class="nav-icon-btn" aria-label="Grid view">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true">
+          <rect x="0" y="0" width="5" height="5" fill="currentColor"/>
+          <rect x="7" y="0" width="5" height="5" fill="currentColor"/>
+          <rect x="0" y="7" width="5" height="5" fill="currentColor"/>
+          <rect x="7" y="7" width="5" height="5" fill="currentColor"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- User chip -->
+    <div id="nav-user">
+      <div class="nav-user-label">
+        SYS_OP_7
+        <span>AUTHORIZED</span>
+      </div>
+      <div class="nav-avatar" aria-hidden="true">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+          <circle cx="6" cy="4" r="2.5" fill="currentColor"/>
+          <path d="M1 11c0-3 2-4 5-4s5 1 5 4" fill="currentColor"/>
+        </svg>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ════════════════════════════════════════════════════════
+       LAYOUT
+  ═════════════════════════════════════════════════════════ -->
+  <div id="layout">
+
+    <!-- ── SIDEBAR ───────────────────────────────────────── -->
+    <aside id="sidebar" aria-label="Navigation">
+      <div id="op-badge">
+        <span class="op-label">OPERATOR_LVL</span>
+        <span class="op-level">07</span>
+      </div>
+
+      <nav class="sidebar-nav" aria-label="Report sections">
+        <a href="#" class="nav-item active" aria-current="page" aria-label="Summary — active">
+          SUMMARY
+        </a>
+        <a href={`/repo/${id}/decisions`} class="nav-item" aria-label="Decisions">
+          DECISIONS
+        </a>
+        <a href={`/repo/${id}/contributors`} class="nav-item" aria-label="Contributors">
+          CONTRIBUTORS
+        </a>
+        <a href={`/repo/${id}`} class="nav-item" aria-label="Terminal">
+          TERMINAL
+        </a>
+        <a href={`/repo/${id}`} class="nav-item" aria-label="Uplink">
+          UPLINK
+        </a>
+
+        <div class="nav-divider" aria-hidden="true"></div>
+
+        <a href={`/repo/${id}/rejections`} class="nav-item" aria-label="Archive">
+          ARCHIVE
+        </a>
+        <a href="#" class="nav-item" aria-label="Sensors">
+          SENSORS
+        </a>
+        <a href={`/repo/${id}/debates`} class="nav-item" aria-label="Decrypt">
+          DECRYPT
+        </a>
+        <a href="#" class="nav-item" aria-label="System">
+          SYSTEM
+        </a>
+
+        <span class="sidebar-spacer"></span>
+
+        <a href="#" class="nav-item nav-item-util" aria-label="Docs">
+          <svg width="9" height="9" viewBox="0 0 9 9" fill="none" aria-hidden="true" style="flex-shrink:0">
+            <circle cx="4.5" cy="4.5" r="4" stroke="currentColor" stroke-width="1"/>
+            <line x1="4.5" y1="4" x2="4.5" y2="7" stroke="currentColor" stroke-width="1"/>
+            <circle cx="4.5" cy="2.5" r="0.5" fill="currentColor"/>
+          </svg>
+          DOCS
+        </a>
+        <a href="/" class="nav-item nav-item-util" aria-label="Logout">
+          <svg width="9" height="9" viewBox="0 0 9 9" fill="none" aria-hidden="true" style="flex-shrink:0">
+            <path d="M3.5 2H1V8H3.5" stroke="currentColor" stroke-width="1" fill="none"/>
+            <line x1="4" y1="4.5" x2="9" y2="4.5" stroke="currentColor" stroke-width="1"/>
+            <polyline points="7,3 9,4.5 7,6" stroke="currentColor" stroke-width="1" fill="none"/>
+          </svg>
+          LOGOUT
+        </a>
+      </nav>
+    </aside>
+
+    <!-- ── MAIN AREA ──────────────────────────────────────── -->
+    <div id="main-area">
+
+      <!-- Page header -->
+      <header id="page-header">
+        <div class="breadcrumb-row">
+          <span class="bc-report">INTELLIGENCE_REPORT</span>
+          <span class="bc-sep">/</span>
+          <span class="bc-repo">{repoSlug}</span>
+        </div>
+        <h1 class="page-title">REPOSITORY INTELLIGENCE SUMMARY</h1>
+      </header>
+
+      <!-- Metadata strip -->
+      <div id="meta-strip" aria-label="Report metadata">
+        <div class="meta-cell" aria-label={`Analysis ID: ${analysisId}`}>
+          <span class="meta-label">ANALYSIS_ID</span>
+          <span class="meta-value">{analysisId}</span>
+        </div>
+        <div class="meta-cell" aria-label={`Decisions indexed: ${stats.decisions}`}>
+          <span class="meta-label">DECISIONS_INDEXED</span>
+          <span class="meta-value" id="meta-decisions">{stats.decisions}</span>
+        </div>
+        <div class="meta-cell" aria-label={`Debates found: ${stats.debates}`}>
+          <span class="meta-label">DEBATES_FOUND</span>
+          <span class="meta-value" id="meta-debates">{stats.debates}</span>
+        </div>
+        <div class="meta-cell" aria-label={`Rejections logged: ${stats.rejections}`}>
+          <span class="meta-label">REJECTIONS_LOGGED</span>
+          <span class="meta-value accent" id="meta-rejections">{String(stats.rejections).padStart(2,'0')}</span>
+        </div>
+      </div>
+
+      <!-- Content area -->
+      <div id="content-area">
+
+        <!-- ── NARRATIVE DOCUMENT ─────────────────────── -->
+        <article id="narrative-col" aria-label="Intelligence narrative">
+          {sections.map((s, i) => (
+            <>
+              <div class="narrative-section" id={`section-${s.key}`}>
+                <div class="section-header" aria-label={`Section ${s.num}: ${s.label}`}>
+                  <span class="section-num">{s.num}</span>
+                  <span class="section-label">{s.label}</span>
+                </div>
+                {s.body.map((para, pi) => {
+                  // First two words get .lead color
+                  const words   = para.split(' ');
+                  const leadEnd = words.slice(0,2).join(' ');
+                  const rest    = words.slice(2).join(' ');
+                  return (
+                    <p class="section-para">
+                      <span class="lead">{leadEnd} </span>{rest}
+                    </p>
+                  );
+                })}
+              </div>
+              {i < sections.length - 1 && <div class="section-sep" aria-hidden="true"></div>}
+            </>
+          ))}
+        </article>
+
+        <!-- ── RIGHT CONTROL PANEL ────────────────────── -->
+        <aside id="ctrl-panel" aria-label="Report controls">
+
+          <!-- Report status -->
+          <div class="cp-section">
+            <span class="cp-label">REPORT_STATUS</span>
+            <div class="status-row" aria-label="Integrity: 98.4%">
+              <span class="status-key">INTEGRITY</span>
+              <span class="status-val" id="integrity-val">98.4%</span>
+            </div>
+            <div class="integrity-bar-wrap" aria-hidden="true">
+              <div class="integrity-bar-track">
+                <div class="integrity-bar-fill" style="width:98.4%"></div>
+              </div>
+            </div>
+            <div class="status-row" aria-label="Confidence: HIGH">
+              <span class="status-key">CONFIDENCE</span>
+              <span class="status-val" style="color:#cc0000;">HIGH</span>
+            </div>
+          </div>
+
+          <!-- Section index -->
+          <div class="cp-section">
+            <span class="cp-label">SECTION_INDEX</span>
+            {sections.map((s) => (
+              <a
+                href={`#section-${s.key}`}
+                class="index-item"
+                aria-label={`Jump to section ${s.num}: ${s.label}`}
+                onclick={`event.preventDefault(); document.getElementById('section-${s.key}')?.scrollIntoView({behavior:'instant'})`}
+              >
+                <span class="index-num">{s.num}</span>
+                <span class="index-name">{s.label.replace(/_/g,' ')}</span>
+              </a>
+            ))}
+          </div>
+
+          <!-- Regenerate + export -->
+          <div class="cp-section">
+            <button id="regen-btn" type="button" aria-label="Regenerate intelligence summary">
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+                <path d="M 8,5 A 3,3 0 1 1 5,2" stroke="currentColor" stroke-width="1" fill="none"/>
+                <polyline points="5,0 5,3 8,2" stroke="currentColor" stroke-width="1" fill="none"/>
+              </svg>
+              REGENERATE_SUMMARY
+            </button>
+            <div class="export-row">
+              <button class="export-btn" type="button" id="export-pdf-btn" aria-label="Export as PDF">EXPORT_PDF</button>
+              <button class="export-btn" type="button" id="export-json-btn" aria-label="Export as raw JSON">RAW_JSON</button>
+            </div>
+          </div>
+
+        </aside>
+
+        <!-- ── GENERATION LOG ─────────────────────────── -->
+        <section id="gen-log" style="position:relative;" aria-label="Generation log">
+          <div id="gen-log-header">
+            <div class="gen-header-left">
+              <span class="gen-sq" aria-hidden="true"></span>
+              GENERATION_LOG
+              <span class="gen-sep">//</span>
+              NIM_STDOUT
+            </div>
+            <span class="gen-header-right">MODEL: llama-3.1-nemotron-70b</span>
+          </div>
+          <div id="gen-log-body" role="log" aria-label="NIM generation log" aria-live="polite">
+            <!-- Seed lines matching screenshot -->
+            <div class="g-line"><span class="g-prefix">&gt; </span><span class="g-tag-info">[INFO] FETCHING_REPOSITORY_METADATA ... 200 OK</span></div>
+            <div class="g-line"><span class="g-prefix">&gt; </span><span class="g-tag-warn">[WARN] ANOMALOUS_COMMIT_PATTERN DETECTED in branch <span class="g-em">'master'</span></span></div>
+            <div class="g-line"><span class="g-prefix">&gt; </span><span class="g-tag-info">[INFO] ASSEMBLING_INTEL_PACKAGE_ALPHA... <span class="g-em">COMPLETE</span></span></div>
+          </div>
+          <span id="log-timestamp" aria-hidden="true">TERMINAL_FEED: 00:17:04</span>
+        </section>
+
+      </div><!-- /content-area -->
+    </div><!-- /main-area -->
+  </div><!-- /layout -->
+
+  <!-- ════════════════════════════════════════════════════════
+       SCRIPTS
+  ═════════════════════════════════════════════════════════ -->
+  <script define:vars={{ seedSections: sections, repoStats: stats }}>
+    const API_BASE = (window as any).__GLYPH_API__ ?? (import.meta as any).env?.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+
+    // ── Timestamp watermark ───────────────────────────────
+    (function initTimestamp() {
+      const el = document.getElementById('log-timestamp');
+      if (!el) return;
+      function tick() {
+        const d = new Date();
+        const h = String(d.getHours()).padStart(2,'0');
+        const m = String(d.getMinutes()).padStart(2,'0');
+        const s = String(d.getSeconds()).padStart(2,'0');
+        el.textContent = `TERMINAL_FEED: ${h}:${m}:${s}`;
+        setTimeout(tick, 1000);
+      }
+      tick();
+    })();
+
+    // ── Live generation log ───────────────────────────────
+    (function initGenLog() {
+      const body = document.getElementById('gen-log-body');
+      if (!body) return;
+
+      const pool = [
+        () => `<span class="g-prefix">&gt; </span><span class="g-tag-info">[NIM] Prompt tokens: <span class="g-em">${Math.floor(Math.random()*500+2800)}</span> — context window: 128k</span>`,
+        () => `<span class="g-prefix">&gt; </span><span class="g-tag-info">[NIM] Sampling temperature: 0.3 — max_tokens: 2048</span>`,
+        () => `<span class="g-prefix">&gt; </span><span class="g-tag-info">[PARSE] Section 01 // ORIGIN_AND_INTENT — <span class="g-em">extracted</span></span>`,
+        () => `<span class="g-prefix">&gt; </span><span class="g-tag-info">[PARSE] Section 02 // ARCHITECTURAL_EVOLUTION — <span class="g-em">extracted</span></span>`,
+        () => `<span class="g-prefix">&gt; </span><span class="g-tag-info">[PARSE] Section 03 // KEY_DECISIONS — <span class="g-em">${repoStats.decisions} nodes identified</span></span>`,
+        () => `<span class="g-prefix">&gt; </span><span class="g-tag-info">[PARSE] Section 04 // DEBATE_RECORD — <span class="g-em">${repoStats.debates} threads resolved</span></span>`,
+        () => `<span class="g-prefix">&gt; </span><span class="g-tag-info">[PARSE] Section 05 // REJECTION_VAULT — <span class="g-em">${repoStats.rejections} records sealed</span></span>`,
+        () => `<span class="g-prefix">&gt; </span><span class="g-tag-warn">[WARN] ANOMALOUS_COMMIT_PATTERN DETECTED in branch <span class="g-em">'master'</span></span>`,
+        () => `<span class="g-prefix">&gt; </span><span class="g-tag-info">[NIM] Response complete — confidence: <span class="g-em">98.4%</span></span>`,
+        () => `<span class="g-prefix">&gt; </span><span class="g-tag-info">[SYSTEM] Narrative written to report store</span>`,
+        () => `<span class="g-prefix">&gt; </span><span class="g-tag-info">[INFO] ASSEMBLING_INTEL_PACKAGE_ALPHA... <span class="g-em">COMPLETE</span></span>`,
+      ];
+      let idx = 0;
+      setInterval(() => {
+        const line = document.createElement('div');
+        line.className = 'g-line';
+        line.innerHTML = pool[idx % pool.length]();
+        idx++;
+        body.appendChild(line);
+        body.scrollTop = body.scrollHeight;
+        while (body.children.length > 30) body.removeChild(body.firstChild);
+      }, 3000);
+    })();
+
+    // ── Hydrate from real API ─────────────────────────────
+    (function hydrateNarrative() {
+      const pathParts = window.location.pathname.split('/').filter(Boolean);
+      const jobId     = pathParts[1] ?? '';
+      const uuidRe    = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRe.test(jobId)) return;
+
+      const nimKey = sessionStorage.getItem('glyph_nim_key') ?? '';
+      if (!nimKey) return;
+
+      fetch(`${API_BASE}/api/repo/${jobId}/summary`, {
+        headers: { 'X-Nim-Api-Key': nimKey },
+      })
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!data?.narrative) return;
+          // Split narrative into paragraphs and distribute into sections
+          const paras = data.narrative
+            .split(/\n\n+/)
+            .map(p => p.trim())
+            .filter(Boolean);
+
+          const col = document.getElementById('narrative-col');
+          if (!col) return;
+          col.innerHTML = '';
+
+          const sectionLabels = [
+            '01 // ORIGIN_AND_INTENT',
+            '02 // ARCHITECTURAL_EVOLUTION',
+            '03 // KEY_DECISIONS',
+            '04 // DEBATE_RECORD',
+            '05 // REJECTION_VAULT',
+          ];
+
+          const perSection = Math.ceil(paras.length / 5);
+          sectionLabels.forEach((lbl, si) => {
+            const chunk = paras.slice(si * perSection, (si + 1) * perSection);
+            if (!chunk.length) return;
+
+            const sec = document.createElement('div');
+            sec.className = 'narrative-section';
+            sec.id        = `section-s${si}`;
+
+            const hdr = document.createElement('div');
+            hdr.className = 'section-header';
+            hdr.innerHTML = `<span class="section-num">${String(si+1).padStart(2,'0')}</span><span class="section-label">${lbl.split(' // ')[1]}</span>`;
+            sec.appendChild(hdr);
+
+            chunk.forEach(para => {
+              const p     = document.createElement('p');
+              p.className = 'section-para';
+              const words = para.split(' ');
+              p.innerHTML = `<span class="lead">${words.slice(0,2).join(' ')} </span>${words.slice(2).join(' ')}`;
+              sec.appendChild(p);
+            });
+
+            col.appendChild(sec);
+            if (si < 4) {
+              const sep = document.createElement('div');
+              sep.className = 'section-sep';
+              col.appendChild(sep);
+            }
+          });
+
+          // Update meta stats
+          if (data.node_count) {
+            const md = document.getElementById('meta-decisions');
+            if (md) md.textContent = String(data.node_count);
+          }
+        })
+        .catch(() => {});
+    })();
+
+    // ── Regenerate button ─────────────────────────────────
+    (function initRegen() {
+      const btn = document.getElementById('regen-btn');
+      if (!btn) return;
+      btn.addEventListener('click', async () => {
+        const pathParts = window.location.pathname.split('/').filter(Boolean);
+        const jobId     = pathParts[1] ?? '';
+        const uuidRe    = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const nimKey    = sessionStorage.getItem('glyph_nim_key') ?? '';
+
+        if (!uuidRe.test(jobId) || !nimKey) {
+          btn.textContent = 'NIM_KEY_REQUIRED';
+          setTimeout(() => { btn.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M 8,5 A 3,3 0 1 1 5,2" stroke="currentColor" stroke-width="1" fill="none"/><polyline points="5,0 5,3 8,2" stroke="currentColor" stroke-width="1" fill="none"/></svg> REGENERATE_SUMMARY'; }, 2000);
+          return;
+        }
+
+        btn.textContent = 'GENERATING...';
+        (btn as HTMLButtonElement).disabled = true;
+
+        try {
+          const resp = await fetch(`${API_BASE}/api/repo/${jobId}/summary`, {
+            headers: { 'X-Nim-Api-Key': nimKey },
+          });
+          if (resp.ok) {
+            window.location.reload();
+          } else {
+            btn.textContent = 'FAILED — RETRY';
+          }
+        } catch {
+          btn.textContent = 'ERROR';
+        } finally {
+          (btn as HTMLButtonElement).disabled = false;
+          setTimeout(() => { btn.innerHTML = '<svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M 8,5 A 3,3 0 1 1 5,2" stroke="currentColor" stroke-width="1" fill="none"/><polyline points="5,0 5,3 8,2" stroke="currentColor" stroke-width="1" fill="none"/></svg> REGENERATE_SUMMARY'; }, 3000);
+        }
+      });
+    })();
+
+    // ── Export buttons ────────────────────────────────────
+    (function initExport() {
+      document.getElementById('export-json-btn')?.addEventListener('click', () => {
+        const narrative = document.getElementById('narrative-col')?.innerText ?? '';
+        const blob = new Blob([JSON.stringify({ narrative, generated: new Date().toISOString() }, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = 'glyph-summary.json'; a.click();
+      });
+      document.getElementById('export-pdf-btn')?.addEventListener('click', () => {
+        window.print();
+      });
+    })();
+  </script>
+
+</body>
+</html>

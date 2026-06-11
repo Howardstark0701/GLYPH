@@ -1,0 +1,1132 @@
+---
+// GLYPH OS — Repository Analysis Dashboard
+// src/pages/repo/[id].astro
+
+const { id } = Astro.params;
+
+// Decode the repo URL/id and extract owner/name
+let repoOwner = 'unknown';
+let repoName  = 'unknown';
+try {
+  const decoded = decodeURIComponent(id ?? '');
+  // Support both full URL (https://github.com/owner/name) and owner/name slug
+  const match = decoded.match(/github\.com\/([^\/]+)\/([^\/\s]+)/);
+  if (match) {
+    repoOwner = match[1];
+    repoName  = match[2].replace(/\.git$/, '');
+  } else {
+    const parts = decoded.split('/').filter(Boolean);
+    if (parts.length >= 2) { repoOwner = parts[0]; repoName = parts[1]; }
+    else if (parts.length === 1) { repoName = parts[0]; }
+  }
+} catch (_) {}
+
+const repoSlug    = `${repoOwner}/${repoName}`;
+const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GLYPH — {repoSlug}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset ────────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+      transition: none !important;
+      outline: none;
+    }
+    html, body {
+      margin: 0; padding: 0;
+      background: #131313;
+      color: #e5e2e1;
+      font-family: 'Karla', sans-serif;
+      height: 100%;
+      overflow: hidden; /* dashboard is fixed-layout */
+    }
+
+    /* ── Type helpers ─────────────────────────────────────── */
+    .mono       { font-family: 'JetBrains Mono', monospace; }
+    .display    { font-family: 'Space Grotesk', sans-serif; }
+    .data-sm    { font-family: 'JetBrains Mono', monospace; font-size: 0.6875rem; line-height: 1rem; }
+    .label-caps { font-family: 'JetBrains Mono', monospace; font-size: 0.6875rem; letter-spacing: 0.1em; text-transform: uppercase; line-height: 1rem; }
+
+    /* ── Color helpers ────────────────────────────────────── */
+    .c-muted  { color: #a1a1a1; }
+    .c-red    { color: #cc0000; }
+    .c-em     { color: #e5e2e1; }
+    .c-hero   { color: #ffb4a8; }
+    .c-rust   { color: #5e3f3a; }
+
+    /* ══════════════════════════════════════════════════════
+       TOP NAVBAR  — 48px fixed
+    ══════════════════════════════════════════════════════ */
+    #navbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 48px;
+      background: #131313;
+      border-bottom: 1px solid #262626;
+      display: grid;
+      /* left-meta | glyph-title | search | right-actions */
+      grid-template-columns: 220px 1fr 280px auto;
+      align-items: center;
+      padding: 0 16px 0 0;
+      z-index: 200;
+    }
+
+    /* Left meta block */
+    #nav-meta {
+      padding: 0 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      border-right: 1px solid #262626;
+      height: 100%;
+    }
+    #nav-meta .protocol { font-family:'JetBrains Mono',monospace; font-size:0.6rem; letter-spacing:0.14em; text-transform:uppercase; color:#a1a1a1; }
+    #nav-meta .coord    { font-family:'JetBrains Mono',monospace; font-size:0.6rem; letter-spacing:0.06em; color:#5e3f3a; margin-top:2px; }
+
+    /* GLYPH headline — center-left of remaining space */
+    #nav-brand {
+      padding: 0 20px;
+      display: flex;
+      align-items: center;
+    }
+    #nav-brand a {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 1.25rem;
+      color: #ffb4a8;
+      text-decoration: none;
+      letter-spacing: -0.01em;
+    }
+
+    /* Search */
+    #nav-search {
+      display: flex;
+      align-items: center;
+      border: 1px solid #262626;
+      height: 28px;
+    }
+    #nav-search input {
+      flex: 1;
+      background: #131313;
+      border: none;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6875rem;
+      color: #e5e2e1;
+      padding: 0 10px;
+      height: 100%;
+      letter-spacing: 0.04em;
+    }
+    #nav-search input::placeholder { color: #3a3a3a; }
+
+    /* Right action buttons */
+    #nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-left: 16px;
+    }
+    .nav-icon-btn {
+      width: 28px;
+      height: 28px;
+      background: transparent;
+      border: 1px solid #262626;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #a1a1a1;
+      padding: 0;
+    }
+    .nav-icon-btn:hover { border-color: #cc0000; color: #cc0000; }
+
+    /* ══════════════════════════════════════════════════════
+       LAYOUT  — sidebar + main, below navbar
+    ══════════════════════════════════════════════════════ */
+    #layout {
+      position: fixed;
+      top: 48px;
+      left: 0; right: 0; bottom: 0;
+      display: flex;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       LEFT SIDEBAR  — 160px
+    ══════════════════════════════════════════════════════ */
+    #sidebar {
+      width: 160px;
+      flex-shrink: 0;
+      background: #131313;
+      border-right: 1px solid #262626;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .sidebar-nav {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding-top: 8px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #a1a1a1;
+      cursor: pointer;
+      user-select: none;
+      border: none;
+      background: transparent;
+      width: 100%;
+      text-align: left;
+    }
+    .nav-item:hover:not(.active) { color: #e5e2e1; background: #1a1a1a; }
+    .nav-item.active { background: #cc0000; color: #ffffff; }
+    .nav-item svg { flex-shrink: 0; }
+
+    .sidebar-footer {
+      border-top: 1px solid #262626;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    #execute-fetch {
+      width: 100%;
+      background: #cc0000;
+      border: none;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #ffffff;
+      padding: 8px 0;
+      cursor: pointer;
+      text-align: center;
+    }
+    #execute-fetch:hover { background: #ff0000; }
+
+    .sidebar-util-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .util-btn {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: transparent;
+      border: 1px solid #262626;
+      color: #a1a1a1;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.55rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 5px 6px;
+      cursor: pointer;
+    }
+    .util-btn:hover { border-color: #cc0000; color: #cc0000; }
+
+    /* ══════════════════════════════════════════════════════
+       MAIN AREA
+    ══════════════════════════════════════════════════════ */
+    #main-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-width: 0;
+    }
+
+    /* Page header strip */
+    #page-header {
+      padding: 14px 20px 12px;
+      border-bottom: 1px solid #262626;
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+    #page-header-left .page-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 1.6rem;
+      color: #e5e2e1;
+      line-height: 1;
+      margin: 0;
+    }
+    #page-header-left .page-context {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #a1a1a1;
+      margin-top: 5px;
+    }
+    #page-header-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 3px;
+    }
+    #page-header-right .uptime,
+    #page-header-right .heartbeat {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      color: #a1a1a1;
+      letter-spacing: 0.06em;
+    }
+    #page-header-right .heartbeat-status { color: #cc0000; }
+
+    /* Content grid */
+    #content-grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 240px;
+      grid-template-rows: 1fr 220px;
+      gap: 0;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       DECISION GRAPH PANEL  — top-left
+    ══════════════════════════════════════════════════════ */
+    #graph-panel {
+      grid-column: 1;
+      grid-row: 1;
+      border-right: 1px solid #262626;
+      border-bottom: 1px solid #262626;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #0e0e0e;
+    }
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 14px;
+      border-bottom: 1px solid #262626;
+      flex-shrink: 0;
+      background: #131313;
+    }
+    .panel-header-left  { font-family:'JetBrains Mono',monospace; font-size:0.6rem; letter-spacing:0.12em; text-transform:uppercase; color:#a1a1a1; }
+    .panel-header-right { font-family:'JetBrains Mono',monospace; font-size:0.6rem; letter-spacing:0.06em; color:#a1a1a1; }
+    .panel-header-sep   { color: #cc0000; margin: 0 6px; }
+
+    #graph-container {
+      flex: 1;
+      position: relative;
+      overflow: hidden;
+    }
+    #graph-svg { width: 100%; height: 100%; display: block; }
+
+    /* D3 node rects */
+    .g-node rect {
+      fill: #131313;
+      stroke: #cc0000;
+      stroke-width: 1;
+    }
+    .g-node text.node-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8px;
+      fill: #e5e2e1;
+      font-weight: 600;
+    }
+    .g-node text.node-sha {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 7px;
+      fill: #a1a1a1;
+    }
+
+    /* D3 links */
+    .g-link-decision { stroke: #cc0000; stroke-width: 1; fill: none; }
+    .g-link-rejected { stroke: #cc0000; stroke-width: 1; fill: none; stroke-dasharray: 4 3; }
+    .g-link-debate   { stroke: #5e3f3a; stroke-width: 1; fill: none; }
+
+    /* Pagination dots */
+    #graph-pagination {
+      position: absolute;
+      bottom: 12px;
+      left: 14px;
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+    .page-dot {
+      width: 8px;
+      height: 8px;
+      background: #262626;
+      cursor: pointer;
+    }
+    .page-dot.active { background: #cc0000; }
+
+    /* ══════════════════════════════════════════════════════
+       INTELLIGENCE SIDEBAR  — top-right
+    ══════════════════════════════════════════════════════ */
+    #intel-panel {
+      grid-column: 2;
+      grid-row: 1;
+      border-bottom: 1px solid #262626;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      background: #131313;
+    }
+
+    .intel-section {
+      padding: 12px 14px;
+      border-bottom: 1px solid #262626;
+    }
+    .intel-section:last-child { border-bottom: none; }
+
+    .intel-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #cc0000;
+      margin-bottom: 10px;
+      display: block;
+    }
+
+    /* Metric rows */
+    .metric-row {
+      margin-bottom: 10px;
+    }
+    .metric-row:last-child { margin-bottom: 0; }
+    .metric-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+    .metric-name {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #a1a1a1;
+    }
+    .metric-pct {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.06em;
+      color: #cc0000;
+    }
+    .metric-bar-track {
+      width: 100%;
+      height: 1px;
+      background: #262626;
+      position: relative;
+    }
+    .metric-bar-fill {
+      height: 1px;
+      background: #cc0000;
+      position: absolute;
+      top: 0; left: 0;
+    }
+
+    /* Neural forecast body */
+    .forecast-body {
+      font-family: 'Karla', sans-serif;
+      font-size: 0.75rem;
+      color: #a1a1a1;
+      line-height: 1.5;
+      margin-bottom: 12px;
+    }
+    .forecast-body .sha-inline { color: #cc0000; font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; }
+
+    #override-btn {
+      width: 100%;
+      background: #cc0000;
+      border: none;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #ffffff;
+      padding: 8px 0;
+      cursor: pointer;
+      text-align: center;
+    }
+    #override-btn:hover { background: #ff0000; }
+
+    /* ══════════════════════════════════════════════════════
+       LIVE STREAM PANEL  — bottom full-width
+    ══════════════════════════════════════════════════════ */
+    #stream-panel {
+      grid-column: 1 / 3;
+      grid-row: 2;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #0e0e0e;
+      border-top: 1px solid #262626;
+    }
+    #stream-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 7px 14px;
+      border-bottom: 1px solid #262626;
+      flex-shrink: 0;
+      background: #131313;
+    }
+    .stream-header-left {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #e5e2e1;
+    }
+    .stream-live-sq {
+      width: 7px;
+      height: 7px;
+      background: #cc0000;
+      flex-shrink: 0;
+    }
+    .stream-header-right {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #a1a1a1;
+    }
+    #stream-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+    .stream-line {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      line-height: 1.6;
+      color: #a1a1a1;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+    }
+    .stream-line .ln    { color: #3a3a3a; margin-right: 8px; min-width: 16px; display: inline-block; }
+    .stream-line .ev-tr { color: #a1a1a1; }
+    .stream-line .ev-cr { color: #cc0000; font-weight: 700; }
+    .stream-line .ev-kw { color: #e5e2e1; }
+
+    /* Scrollbar */
+    #stream-body::-webkit-scrollbar { width: 3px; }
+    #stream-body::-webkit-scrollbar-track { background: #0e0e0e; }
+    #stream-body::-webkit-scrollbar-thumb { background: #262626; }
+  </style>
+</head>
+<body>
+
+  <!-- ════════════════════════════════════════════════════════
+       TOP NAVBAR
+  ═════════════════════════════════════════════════════════ -->
+  <nav id="navbar" aria-label="Dashboard navigation">
+
+    <!-- Left meta -->
+    <div id="nav-meta">
+      <span class="protocol">CHARCOAL_PROTOCOL</span>
+      <span class="coord">COORD: {repoSlug}</span>
+    </div>
+
+    <!-- GLYPH brand -->
+    <div id="nav-brand">
+      <a href="/" aria-label="Return to GLYPH home">GLYPH</a>
+    </div>
+
+    <!-- Search -->
+    <div id="nav-search" role="search">
+      <input
+        type="search"
+        placeholder="LOCATE_ENTITY..."
+        autocomplete="off"
+        spellcheck="false"
+        aria-label="Locate entity in repository graph"
+      />
+    </div>
+
+    <!-- Right icon buttons -->
+    <div id="nav-actions" aria-label="Dashboard actions">
+      <!-- Contributors -->
+      <button class="nav-icon-btn" aria-label="View contributors" title="Contributors">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+          <circle cx="5" cy="4" r="2" stroke="currentColor" stroke-width="1"/>
+          <circle cx="9" cy="4" r="2" stroke="currentColor" stroke-width="1"/>
+          <path d="M1 11c0-2 1.8-3 4-3s4 1 4 3" stroke="currentColor" stroke-width="1" fill="none"/>
+          <path d="M9 8c1.5 0 3 0.8 3 3" stroke="currentColor" stroke-width="1" fill="none"/>
+        </svg>
+      </button>
+      <!-- Issues -->
+      <button class="nav-icon-btn" aria-label="View issues" title="Issues">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+          <rect x="1" y="1" width="11" height="11" stroke="currentColor" stroke-width="1"/>
+          <line x1="6.5" y1="4" x2="6.5" y2="7" stroke="currentColor" stroke-width="1.2"/>
+          <rect x="6" y="8.5" width="1" height="1" fill="currentColor"/>
+        </svg>
+      </button>
+      <!-- Network -->
+      <button class="nav-icon-btn" aria-label="View network graph" title="Network">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+          <rect x="5.5" y="0.5" width="2" height="2" fill="currentColor"/>
+          <rect x="0.5" y="5.5" width="2" height="2" fill="currentColor"/>
+          <rect x="10.5" y="5.5" width="2" height="2" fill="currentColor"/>
+          <rect x="5.5" y="10.5" width="2" height="2" fill="currentColor"/>
+          <line x1="6.5" y1="2.5" x2="6.5" y2="5.5" stroke="currentColor" stroke-width="1"/>
+          <line x1="2.5" y1="6.5" x2="5.5" y2="6.5" stroke="currentColor" stroke-width="1"/>
+          <line x1="7.5" y1="6.5" x2="10.5" y2="6.5" stroke="currentColor" stroke-width="1"/>
+          <line x1="6.5" y1="7.5" x2="6.5" y2="10.5" stroke="currentColor" stroke-width="1"/>
+        </svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ════════════════════════════════════════════════════════
+       LAYOUT
+  ═════════════════════════════════════════════════════════ -->
+  <div id="layout">
+
+    <!-- ── LEFT SIDEBAR ─────────────────────────────────── -->
+    <aside id="sidebar" aria-label="Navigation sidebar">
+      <nav class="sidebar-nav" aria-label="Analysis sections">
+
+        <button class="nav-item active" data-section="recon" aria-current="page" aria-label="Recon — active">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <rect x="0" y="0" width="10" height="10" stroke="currentColor" stroke-width="1" fill="none"/>
+            <rect x="2" y="2" width="6" height="6" fill="currentColor"/>
+          </svg>
+          RECON
+        </button>
+
+        <button class="nav-item" data-section="vcs" aria-label="VCS Log">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <circle cx="2" cy="2" r="1.5" stroke="currentColor" stroke-width="1"/>
+            <circle cx="2" cy="8" r="1.5" stroke="currentColor" stroke-width="1"/>
+            <circle cx="8" cy="5" r="1.5" stroke="currentColor" stroke-width="1"/>
+            <line x1="2" y1="3.5" x2="2" y2="6.5" stroke="currentColor" stroke-width="1"/>
+            <path d="M 2,6.5 C 2,8 8,8 8,6.5" stroke="currentColor" stroke-width="1" fill="none"/>
+          </svg>
+          VCS_LOG
+        </button>
+
+        <button class="nav-item" data-section="decrypt" aria-label="Decrypt">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <rect x="2" y="4" width="6" height="5" stroke="currentColor" stroke-width="1" fill="none"/>
+            <path d="M 3,4 L 3,3 C 3,1.3 7,1.3 7,3 L 7,4" stroke="currentColor" stroke-width="1" fill="none"/>
+          </svg>
+          DECRYPT
+        </button>
+
+        <button class="nav-item" data-section="index" aria-label="Index">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <line x1="1" y1="2" x2="9" y2="2" stroke="currentColor" stroke-width="1"/>
+            <line x1="1" y1="5" x2="7" y2="5" stroke="currentColor" stroke-width="1"/>
+            <line x1="1" y1="8" x2="5" y2="8" stroke="currentColor" stroke-width="1"/>
+          </svg>
+          INDEX
+        </button>
+
+        <button class="nav-item" data-section="network" aria-label="Network">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <rect x="4" y="0" width="2" height="2" fill="currentColor"/>
+            <rect x="0" y="4" width="2" height="2" fill="currentColor"/>
+            <rect x="8" y="4" width="2" height="2" fill="currentColor"/>
+            <line x1="5" y1="2" x2="5" y2="4" stroke="currentColor" stroke-width="1"/>
+            <line x1="2" y1="5" x2="4" y2="5" stroke="currentColor" stroke-width="1"/>
+            <line x1="6" y1="5" x2="8" y2="5" stroke="currentColor" stroke-width="1"/>
+          </svg>
+          NETWORK
+        </button>
+
+      </nav>
+
+      <div class="sidebar-footer">
+        <button id="execute-fetch" type="button" aria-label="Execute fetch — trigger repository analysis">
+          EXECUTE_FETCH
+        </button>
+        <div class="sidebar-util-row">
+          <button class="util-btn" aria-label="Open system log">
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
+              <rect x="0" y="0" width="8" height="8" stroke="currentColor" stroke-width="1" fill="none"/>
+              <line x1="1.5" y1="2.5" x2="6.5" y2="2.5" stroke="currentColor" stroke-width="0.8"/>
+              <line x1="1.5" y1="4" x2="6.5" y2="4" stroke="currentColor" stroke-width="0.8"/>
+              <line x1="1.5" y1="5.5" x2="4.5" y2="5.5" stroke="currentColor" stroke-width="0.8"/>
+            </svg>
+            SYS_LOG
+          </button>
+          <button class="util-btn" aria-label="Terminate session">
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
+              <line x1="1" y1="1" x2="7" y2="7" stroke="currentColor" stroke-width="1"/>
+              <line x1="7" y1="1" x2="1" y2="7" stroke="currentColor" stroke-width="1"/>
+            </svg>
+            TERMINATE
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── MAIN AREA ─────────────────────────────────────── -->
+    <div id="main-area">
+
+      <!-- Page header -->
+      <header id="page-header">
+        <div id="page-header-left">
+          <h1 class="page-title">SYSTEM RECONSTRUCTION: <span style="color:#cc0000;">ACTIVE</span></h1>
+          <p class="page-context">THREAD CONTEXT: {repoContext}</p>
+        </div>
+        <div id="page-header-right">
+          <span class="uptime">UPTIME: <span id="uptime-val">00:00:00:00</span></span>
+          <span class="heartbeat">STATUS: <span class="heartbeat-status" id="heartbeat-val">HEARTBEAT_STABLE</span></span>
+        </div>
+      </header>
+
+      <!-- Content grid -->
+      <div id="content-grid">
+
+        <!-- ── DECISION GRAPH ──────────────────────────── -->
+        <section id="graph-panel" aria-labelledby="graph-header-label">
+          <div class="panel-header">
+            <span class="panel-header-left" id="graph-header-label">
+              MAP_OVERLAY_01
+              <span class="panel-header-sep">//</span>
+              DECISION_GRAPH
+            </span>
+            <span class="panel-header-right" id="graph-stats">
+              NODES: <span id="node-count">0</span>&nbsp;&nbsp;DENSITY: <span id="graph-density">0</span>%
+            </span>
+          </div>
+          <div id="graph-container" role="img" aria-label="Interactive decision graph">
+            <svg id="graph-svg" aria-hidden="true"></svg>
+            <div id="graph-pagination" aria-label="Graph layer controls" role="group">
+              <div class="page-dot active" role="button" tabindex="0" aria-label="Layer 1" aria-pressed="true"></div>
+              <div class="page-dot" role="button" tabindex="0" aria-label="Layer 2" aria-pressed="false"></div>
+              <div class="page-dot" role="button" tabindex="0" aria-label="Layer 3" aria-pressed="false"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── INTELLIGENCE SIDEBAR ────────────────────── -->
+        <aside id="intel-panel" aria-label="Intelligence analysis">
+
+          <!-- Probability matrix -->
+          <div class="intel-section">
+            <span class="intel-label">PROBABILITY_MATRIX_X</span>
+
+            <div class="metric-row" role="group" aria-label="Reconstruction success metric">
+              <div class="metric-header">
+                <span class="metric-name">RECONSTRUCTION_SUCCESS</span>
+                <span class="metric-pct">82.4%</span>
+              </div>
+              <div class="metric-bar-track" aria-hidden="true">
+                <div class="metric-bar-fill" style="width:82.4%"></div>
+              </div>
+            </div>
+
+            <div class="metric-row" role="group" aria-label="Intent confidence metric">
+              <div class="metric-header">
+                <span class="metric-name">INTENT_CONFIDENCE</span>
+                <span class="metric-pct">14.1%</span>
+              </div>
+              <div class="metric-bar-track" aria-hidden="true">
+                <div class="metric-bar-fill" style="width:14.1%"></div>
+              </div>
+            </div>
+
+            <div class="metric-row" role="group" aria-label="Debate entropy metric">
+              <div class="metric-header">
+                <span class="metric-name">DEBATE_ENTROPY</span>
+                <span class="metric-pct">3.5%</span>
+              </div>
+              <div class="metric-bar-track" aria-hidden="true">
+                <div class="metric-bar-fill" style="width:3.5%"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Neural forecast -->
+          <div class="intel-section">
+            <span class="intel-label">NEURAL_FORECAST</span>
+            <p class="forecast-body">
+              PREDICTION: ARCHITECTURAL CONFLICT IN 'AUTH_MODULE' IS UNRESOLVABLE VIA AUTOMATED INFERENCE.
+              MANUAL REVIEW SUGGESTED AT COMMIT <span class="sha-inline">0xf3a91c2</span>.
+            </p>
+            <button id="override-btn" type="button" aria-label="Initialize manual override for architectural conflict">
+              INITIALIZE_OVERRIDE
+            </button>
+          </div>
+
+        </aside>
+
+        <!-- ── LIVE RECON STREAM ────────────────────────── -->
+        <section id="stream-panel" aria-labelledby="stream-header-label">
+          <div id="stream-header">
+            <div class="stream-header-left" id="stream-header-label">
+              <span class="stream-live-sq" aria-hidden="true"></span>
+              LIVE_RECON_STREAM
+              <span style="color:#5e3f3a;">//</span>
+              STDOUT
+            </div>
+            <span class="stream-header-right">FILTER: ALL_EVENTS</span>
+          </div>
+          <div id="stream-body" role="log" aria-label="Live intelligence stream output" aria-live="polite">
+            <!-- Seed lines — rendered server-side, JS appends more -->
+            <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: Heartbeat confirmed by <span class="ev-kw">CHARCOAL_CORE</span></span></div>
+            <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: GitHub ingestion synchronized @ <span class="ev-kw">400ms</span></span></div>
+            <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: Parity check starting on <span class="ev-kw">repo_main</span></span></div>
+            <div class="stream-line"><span class="ln" style="color:#cc0000;font-weight:700;">1</span><span class="ev-cr">CRITICAL: DEBATE CLUSTER DETECTED IN PR <span class="ev-kw">#442</span></span></div>
+            <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: Analyzing decision chain: <span class="ev-kw">branch_main</span> v <span class="ev-kw">branch_experimental</span></span></div>
+            <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: Extracting contributor reasoning profiles...</span></div>
+            <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: Intent node written — <span class="ev-kw">ARCHITECTURAL_DECISION_007</span></span></div>
+            <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: Rejection record flagged — <span class="ev-kw">ABANDONED_FEATURE_012</span></span></div>
+            <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: Analyzing merge conflict: <span class="ev-kw">branch_main</span> v <span class="ev-kw">branch_dev</span></span></div>
+          </div>
+        </section>
+
+      </div><!-- /content-grid -->
+    </div><!-- /main-area -->
+  </div><!-- /layout -->
+
+  <!-- ════════════════════════════════════════════════════════
+       SCRIPTS
+  ═════════════════════════════════════════════════════════ -->
+  <script>
+    // ── Uptime counter ────────────────────────────────────
+    (function initUptime() {
+      const el = document.getElementById('uptime-val')!;
+      const hb = document.getElementById('heartbeat-val')!;
+      const t0 = Date.now();
+
+      function pad(n: number, d = 2) { return String(n).padStart(d, '0'); }
+
+      function tick() {
+        const ms  = Date.now() - t0;
+        const s   = Math.floor(ms / 1000);
+        const m   = Math.floor(s / 60);
+        const h   = Math.floor(m / 60);
+        const d   = Math.floor(h / 24);
+        el.textContent = `${pad(d)}:${pad(h % 24)}:${pad(m % 60)}:${pad(s % 60)}`;
+        requestAnimationFrame(tick);
+      }
+      tick();
+
+      // Heartbeat pulse: flip text every ~2s to simulate
+      let hbToggle = false;
+      setInterval(() => {
+        hbToggle = !hbToggle;
+        hb.textContent = hbToggle ? 'HEARTBEAT_STABLE' : 'HEARTBEAT_OK';
+      }, 2000);
+    })();
+
+    // ── Sidebar nav ───────────────────────────────────────
+    (function initSidebarNav() {
+      const items = document.querySelectorAll<HTMLButtonElement>('.nav-item');
+      items.forEach(btn => {
+        btn.addEventListener('click', () => {
+          items.forEach(b => { b.classList.remove('active'); b.removeAttribute('aria-current'); });
+          btn.classList.add('active');
+          btn.setAttribute('aria-current', 'page');
+        });
+      });
+    })();
+
+    // ── Execute fetch ─────────────────────────────────────
+    (function initExecuteFetch() {
+      const btn      = document.getElementById('execute-fetch') as HTMLButtonElement;
+      const API_BASE = (import.meta as any).env?.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+
+      function getKeys() {
+        return {
+          github: sessionStorage.getItem('glyph_gh_token') ?? '',
+          nim:    sessionStorage.getItem('glyph_nim_key')  ?? '',
+        };
+      }
+
+      btn.addEventListener('click', async () => {
+        const { github, nim } = getKeys();
+        if (!github || !nim) {
+          btn.textContent = 'KEYS_MISSING';
+          setTimeout(() => { btn.textContent = 'EXECUTE_FETCH'; }, 2000);
+          return;
+        }
+
+        const coordEl  = document.querySelector<HTMLElement>('#page-header-left .page-context');
+        const raw      = coordEl?.textContent ?? '';
+        // Extract slug from "THREAD CONTEXT: OWNER_REPO_ANALYSIS"
+        const slug     = raw.replace('THREAD CONTEXT:', '').replace('_ANALYSIS', '').trim()
+                           .replace(/_/g, '/').toLowerCase();
+
+        btn.textContent = 'FETCHING...';
+        btn.disabled    = true;
+
+        try {
+          const resp = await fetch(`${API_BASE}/api/analyze`, {
+            method:  'POST',
+            headers: {
+              'Content-Type':   'application/json',
+              'X-Github-Token': github,
+              'X-Nim-Api-Key':  nim,
+            },
+            body: JSON.stringify({ repo_url: `https://github.com/${slug}` }),
+          });
+
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.error ?? `HTTP ${resp.status}`);
+
+          btn.textContent = 'RUNNING...';
+
+          const pollInterval = setInterval(async () => {
+            try {
+              const sr = await fetch(`${API_BASE}/api/repo/${data.job_id}/status`);
+              const sd = await sr.json();
+              if (sd.status === 'complete' || sd.status === 'failed') {
+                clearInterval(pollInterval);
+                btn.disabled    = false;
+                btn.textContent = sd.status === 'complete' ? 'COMPLETE ✓' : 'FAILED ✗';
+                setTimeout(() => { btn.textContent = 'EXECUTE_FETCH'; }, 3000);
+              }
+            } catch {
+              clearInterval(pollInterval);
+              btn.disabled    = false;
+              btn.textContent = 'EXECUTE_FETCH';
+            }
+          }, 4000);
+        } catch (err: any) {
+          btn.disabled    = false;
+          btn.textContent = 'ERROR';
+          setTimeout(() => { btn.textContent = 'EXECUTE_FETCH'; }, 2000);
+        }
+      });
+    })();
+
+    // ── Override btn ──────────────────────────────────────
+    (function initOverride() {
+      const btn = document.getElementById('override-btn') as HTMLButtonElement;
+      btn.addEventListener('click', () => {
+        btn.textContent = 'OVERRIDE_QUEUED';
+        setTimeout(() => { btn.textContent = 'INITIALIZE_OVERRIDE'; }, 3000);
+      });
+    })();
+
+    // ── Live stream append ────────────────────────────────
+    (function initStream() {
+      const body = document.getElementById('stream-body')!;
+
+      interface StreamEntry { level: 'trace' | 'critical'; text: string; }
+
+      const pool: StreamEntry[] = [
+        { level: 'trace',    text: 'Commit graph traversal complete — <span class="ev-kw">1,847 nodes</span>' },
+        { level: 'trace',    text: 'NIM API handshake established @ <span class="ev-kw">build.nvidia.com</span>' },
+        { level: 'critical', text: 'DEBATE CLUSTER DETECTED IN PR <span class="ev-kw">#317</span>' },
+        { level: 'trace',    text: 'Intent node written — <span class="ev-kw">ARCHITECTURAL_DECISION_008</span>' },
+        { level: 'trace',    text: 'PR #298 linked to commit <span class="ev-kw">0xa2c4f81</span>' },
+        { level: 'trace',    text: 'Contributor reasoning profile extracted: <span class="ev-kw">@contributor_04</span>' },
+        { level: 'critical', text: 'REJECTION RECORD CONFIRMED — <span class="ev-kw">ABANDONED_FEATURE_019</span>' },
+        { level: 'trace',    text: 'Rate limit headroom: <span class="ev-kw">4,204 / 5,000</span> requests remaining' },
+        { level: 'trace',    text: 'Decision chain resolved: <span class="ev-kw">AUTH_MODULE_V2</span>' },
+        { level: 'trace',    text: 'Repo narrative segment written — <span class="ev-kw">epoch_003</span>' },
+      ];
+      let poolIdx = 0;
+      let criticalCount = 1;
+
+      setInterval(() => {
+        const entry = pool[poolIdx % pool.length];
+        poolIdx++;
+
+        const line = document.createElement('div');
+        line.className = 'stream-line';
+
+        if (entry.level === 'critical') {
+          criticalCount++;
+          line.innerHTML = `<span class="ln" style="color:#cc0000;font-weight:700;">${criticalCount}</span><span class="ev-cr">CRITICAL: ${entry.text}</span>`;
+        } else {
+          line.innerHTML = `<span class="ln">#</span><span class="ev-tr">TRACE: ${entry.text}</span>`;
+        }
+
+        body.appendChild(line);
+        body.scrollTop = body.scrollHeight;
+
+        // Cap at 40 lines
+        while (body.children.length > 40) {
+          body.removeChild(body.firstChild!);
+        }
+      }, 1800);
+    })();
+  </script>
+
+  <!-- ── D3 Decision Graph ──────────────────────────────── -->
+  <script type="module">
+    import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
+
+    const API_BASE = (import.meta as any).env?.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+
+    // Extract job_id from the current URL path: /repo/:id
+    const pathParts = window.location.pathname.split('/').filter(Boolean);
+    const jobId     = pathParts[pathParts.length - 1];
+
+    const svg    = d3.select('#graph-svg');
+    const contEl = document.getElementById('graph-container');
+    if (!contEl) throw new Error('graph-container missing');
+
+    const W = contEl.offsetWidth  || 600;
+    const H = contEl.offsetHeight || 340;
+    svg.attr('viewBox', `0 0 ${W} ${H}`);
+
+    // ── Types ─────────────────────────────────────────────
+    interface GNode { id: string; label: string; sha: string; type?: string; x?: number; y?: number; fx?: number | null; fy?: number | null; }
+    interface GLink { source: string | GNode; target: string | GNode; type: 'decision' | 'rejected' | 'debate'; }
+
+    // ── Fallback static data (shown before API responds) ──
+    const fallbackNodes: GNode[] = [
+      { id: 'n1',  label: 'INIT_REPO',            sha: '0xf3a91c2' },
+      { id: 'n2',  label: 'AUTH_MODULE_V1',        sha: '0x2c4d801' },
+      { id: 'n3',  label: 'AUTH_MODULE_V2',        sha: '0xa9e3f14' },
+      { id: 'n4',  label: 'API_GATEWAY',           sha: '0x7b1c339' },
+      { id: 'n5',  label: 'ABANDONED_FEATURE_012', sha: '0x1d5a0c8' },
+      { id: 'n6',  label: 'DB_SCHEMA_V3',          sha: '0x4f2b17e' },
+      { id: 'n7',  label: 'NIM_PIPELINE',          sha: '0x8e3cc0a' },
+    ];
+    const fallbackLinks: GLink[] = [
+      { source: 'n1', target: 'n2', type: 'decision' },
+      { source: 'n2', target: 'n3', type: 'debate'   },
+      { source: 'n3', target: 'n4', type: 'decision' },
+      { source: 'n2', target: 'n5', type: 'rejected' },
+      { source: 'n4', target: 'n6', type: 'decision' },
+      { source: 'n4', target: 'n7', type: 'decision' },
+    ];
+
+    // ── Fetch real graph data if job_id looks like a UUID ─
+    async function loadGraph(): Promise<{ nodes: GNode[]; links: GLink[] }> {
+      const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRe.test(jobId)) return { nodes: fallbackNodes, links: fallbackLinks };
+
+      try {
+        const resp = await fetch(`${API_BASE}/api/repo/${jobId}/graph`);
+        if (!resp.ok) return { nodes: fallbackNodes, links: fallbackLinks };
+        const data = await resp.json();
+
+        if (!data.nodes?.length) return { nodes: fallbackNodes, links: fallbackLinks };
+
+        const nodes: GNode[] = data.nodes.map((n: any) => ({
+          id:    n.id,
+          label: (n.label ?? 'UNKNOWN').toUpperCase().replace(/\s+/g, '_').slice(0, 22),
+          sha:   n.sha ?? '0x0000000',
+          type:  n.type,
+        }));
+
+        const links: GLink[] = (data.links ?? []).map((l: any) => ({
+          source: l.source,
+          target: l.target,
+          type:   l.type === 'rejected' ? 'rejected' : l.type === 'debate' ? 'debate' : 'decision',
+        }));
+
+        // Update header stats
+        const nodeCountEl = document.getElementById('node-count');
+        const densityEl   = document.getElementById('graph-density');
+        if (nodeCountEl) nodeCountEl.textContent = String(data.meta?.total_nodes ?? nodes.length);
+        if (densityEl)   densityEl.textContent   = String(data.meta?.density_pct ?? 0);
+
+        return { nodes, links };
+      } catch {
+        return { nodes: fallbackNodes, links: fallbackLinks };
+      }
+    }
+
+    // ── Also poll status and update heartbeat display ─────
+    async function pollStatus() {
+      const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRe.test(jobId)) return;
+
+      try {
+        const resp = await fetch(`${API_BASE}/api/repo/${jobId}/status`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const hb   = document.getElementById('heartbeat-val');
+        if (hb) hb.textContent = (data.status ?? 'UNKNOWN').toUpperCase();
+      } catch { /* ignore */ }
+    }
+
+    pollStatus();
+    setInterval(pollStatus, 5000);
+
+    // ── Render ────────────────────────────────────────────
+    const { nodes, links } = await loadGraph();
+
+    const NODE_W = 108;
+    const NODE_H = 32;
+
+    const simulation = d3.forceSimulation<GNode>(nodes)
+      .force('link',    d3.forceLink<GNode, GLink>(links).id(d => d.id).distance(120).strength(0.6))
+      .force('charge',  d3.forceManyBody().strength(-320))
+      .force('center',  d3.forceCenter(W / 2, H / 2))
+      .force('x',       d3.forceX(W / 2).strength(0.04))
+      .force('y',       d3.forceY(H / 2).strength(0.04))
+      .force('collide', d3.forceCollide(70));
+
+    const linkGroup = svg.append('g');
+    const linkEl = linkGroup.selectAll<SVGLineElement, GLink>('line')
+      .data(links).enter().append('line')
+      .attr('class', (d: GLink) =>
+        d.type === 'decision' ? 'g-link-decision' :
+        d.type === 'rejected' ? 'g-link-rejected' : 'g-link-debate');
+
+    const nodeGroup = svg.append('g');
+    const nodeEl = nodeGroup.selectAll<SVGGElement, GNode>('g')
+      .data(nodes).enter().append('g').attr('class', 'g-node')
+      .call(
+        d3.drag<SVGGElement, GNode>()
+          .on('start', (ev: any, d: GNode) => { if (!ev.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+          .on('drag',  (ev: any, d: GNode) => { d.fx = ev.x; d.fy = ev.y; })
+          .on('end',   (ev: any, d: GNode) => { if (!ev.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; })
+      );
+
+    nodeEl.append('rect')
+      .attr('x', -NODE_W / 2).attr('y', -NODE_H / 2)
+      .attr('width', NODE_W).attr('height', NODE_H);
+
+    nodeEl.append('text').attr('class', 'node-title')
+      .attr('x', -NODE_W / 2 + 6).attr('y', -4)
+      .text((d: GNode) => `DECISION // ${d.label}`);
+
+    nodeEl.append('text').attr('class', 'node-sha')
+      .attr('x', -NODE_W / 2 + 6).attr('y', 9)
+      .text((d: GNode) => `COMMIT: ${d.sha}`);
+
+    simulation.on('tick', () => {
+      linkEl
+        .attr('x1', (d: GLink) => ((d.source as GNode).x ?? 0))
+        .attr('y1', (d: GLink) => ((d.source as GNode).y ?? 0))
+        .attr('x2', (d: GLink) => ((d.target as GNode).x ?? 0))
+        .attr('y2', (d: GLink) => ((d.target as GNode).y ?? 0));
+      nodeEl.attr('transform', (d: GNode) => `translate(${d.x ?? 0},${d.y ?? 0})`);
+    });
+  </script>
+
+</body>
+</html>

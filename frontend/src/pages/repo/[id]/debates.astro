@@ -1,0 +1,902 @@
+---
+// GLYPH OS — Debate Explorer
+// src/pages/repo/[id]/debates.astro
+
+const { id } = Astro.params;
+
+// Decode repo slug
+let repoOwner = 'unknown';
+let repoName  = 'unknown';
+try {
+  const decoded = decodeURIComponent(id ?? '');
+  const match   = decoded.match(/github\.com\/([^\/]+)\/([^\/\s]+)/);
+  if (match) {
+    repoOwner = match[1];
+    repoName  = match[2].replace(/\.git$/, '');
+  } else {
+    const parts = decoded.split('/').filter(Boolean);
+    if (parts.length >= 2) { repoOwner = parts[0]; repoName = parts[1]; }
+    else if (parts.length === 1) { repoName = parts[0]; }
+  }
+} catch (_) {}
+
+const repoSlug = `${repoOwner}/${repoName}`;
+
+// ── Static debate data (from GET /repo/:id/debates in prod) ──
+const debateThread = {
+  prNumber:  442,
+  topic:     'AUTH_REDESIGN',
+  status:    'HEATED' as 'HEATED' | 'RESOLVED' | 'ABANDONED',
+};
+
+const sentimentBars = [
+  14, 28, 42, 35, 19, 55, 73, 88, 62, 44,
+  31, 67, 91, 78, 53, 40, 22, 38, 57, 82,
+  69, 47, 33, 18, 25, 48, 71, 94, 76, 59,
+  43, 27,
+];
+
+const sentimentMetrics = {
+  agreement:  18,
+  contention: 54,
+  redundancy: 12,
+  unresolved: 16,
+};
+
+const heatmapRows    = 10;
+const heatmapCols    = 10;
+// Seed a deterministic heat pattern
+const heatValues: number[][] = Array.from({ length: heatmapRows }, (_, r) =>
+  Array.from({ length: heatmapCols }, (_, c) => {
+    const v = Math.sin(r * 1.3 + c * 0.9) * 0.5 + 0.5;
+    return v;
+  })
+);
+
+const heatmapStats = { totalComments: 847, averageDepth: 14 };
+
+const contributors = [
+  {
+    handle:  'lead_author',
+    role:    'PRIMARY_AUTHOR',
+    metric:  { label: 'INFLUENCE', pct: 74 },
+  },
+  {
+    handle:  'core_reviewer',
+    role:    'REVIEWER [CHALLENGER]',
+    metric:  { label: 'CONTENTION', pct: 61 },
+  },
+  {
+    handle:  'dissenter_01',
+    role:    'MODERATOR',
+    metric:  { label: 'NEUTRALITY', pct: 43 },
+  },
+];
+
+const statusColor = debateThread.status === 'HEATED'
+  ? '#cc0000'
+  : debateThread.status === 'RESOLVED'
+  ? '#a1a1a1'
+  : '#5e3f3a';
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GLYPH — Debate Explorer — {repoSlug}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset ───────────────────────────────────────────── */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+      text-shadow: none !important;
+      transition: none !important;
+      outline: none;
+    }
+    html, body {
+      margin: 0; padding: 0;
+      background: #131313;
+      color: #e5e2e1;
+      font-family: 'Karla', sans-serif;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    /* ── Type helpers ─────────────────────────────────────── */
+    .data-sm    { font-family: 'JetBrains Mono', monospace; font-size: 0.6875rem; line-height: 1rem; }
+    .data-lg    { font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 700; line-height: 1; }
+    .label-caps { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; line-height: 1rem; }
+
+    /* ══════════════════════════════════════════════════════
+       TOP NAVBAR — 44px
+    ══════════════════════════════════════════════════════ */
+    #navbar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 44px;
+      background: #131313;
+      border-bottom: 1px solid #262626;
+      display: grid;
+      grid-template-columns: 200px 1fr auto;
+      align-items: center;
+      padding: 0 16px;
+      z-index: 200;
+    }
+    #nav-brand a {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 1.1rem;
+      color: #ffb4a8;
+      text-decoration: none;
+      letter-spacing: -0.01em;
+    }
+    #nav-search {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #nav-search input {
+      width: 280px;
+      height: 28px;
+      background: #131313;
+      border: 1px solid #262626;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6875rem;
+      color: #e5e2e1;
+      padding: 0 10px;
+      letter-spacing: 0.04em;
+    }
+    #nav-search input::placeholder { color: #3a3a3a; }
+    #nav-icons {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .nav-icon-btn {
+      width: 28px; height: 28px;
+      background: transparent;
+      border: 1px solid #262626;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: #a1a1a1;
+      padding: 0;
+    }
+    .nav-icon-btn:hover { border-color: #cc0000; color: #cc0000; }
+
+    /* ── Sub-navbar coord strip ───────────────────────────── */
+    #coord-strip {
+      position: fixed;
+      top: 44px; left: 160px; right: 0;
+      height: 28px;
+      background: #131313;
+      border-bottom: 1px solid #262626;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      gap: 10px;
+      z-index: 190;
+    }
+    .coord-protocol { font-family:'JetBrains Mono',monospace; font-size:0.6rem; letter-spacing:0.12em; text-transform:uppercase; color:#a1a1a1; }
+    .coord-val      { font-family:'JetBrains Mono',monospace; font-size:0.6rem; letter-spacing:0.06em; color:#a1a1a1; }
+    .coord-sep      { color: #262626; }
+
+    /* ══════════════════════════════════════════════════════
+       LAYOUT
+    ══════════════════════════════════════════════════════ */
+    #layout {
+      position: fixed;
+      top: 44px; left: 0; right: 0; bottom: 0;
+      display: flex;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       LEFT SIDEBAR — 160px
+    ══════════════════════════════════════════════════════ */
+    #sidebar {
+      width: 160px;
+      flex-shrink: 0;
+      background: #131313;
+      border-right: 1px solid #262626;
+      display: flex;
+      flex-direction: column;
+      padding-top: 28px; /* offset for coord strip */
+      overflow: hidden;
+      z-index: 180;
+    }
+    .sidebar-nav { flex: 1; display: flex; flex-direction: column; padding-top: 6px; }
+    .nav-item {
+      display: flex; align-items: center; gap: 9px;
+      padding: 9px 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase;
+      color: #a1a1a1;
+      cursor: pointer; user-select: none;
+      border: none; background: transparent;
+      width: 100%; text-align: left; text-decoration: none;
+    }
+    .nav-item:hover:not(.active) { color: #e5e2e1; background: #1a1a1a; }
+    .nav-item.active { background: #cc0000; color: #ffffff; }
+    .sidebar-footer { border-top: 1px solid #262626; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+    #execute-fetch {
+      width: 100%; background: #cc0000; border: none;
+      font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
+      letter-spacing: 0.12em; text-transform: uppercase;
+      color: #ffffff; padding: 8px 0; cursor: pointer; text-align: center;
+    }
+    #execute-fetch:hover { background: #ff0000; }
+    .util-row { display: flex; gap: 6px; }
+    .util-btn {
+      flex: 1; display: flex; align-items: center; gap: 5px;
+      background: transparent; border: 1px solid #262626;
+      color: #a1a1a1; font-family: 'JetBrains Mono', monospace;
+      font-size: 0.55rem; letter-spacing: 0.1em; text-transform: uppercase;
+      padding: 5px 6px; cursor: pointer;
+    }
+    .util-btn:hover { border-color: #cc0000; color: #cc0000; }
+
+    /* ══════════════════════════════════════════════════════
+       MAIN AREA
+    ══════════════════════════════════════════════════════ */
+    #main-area {
+      flex: 1; display: flex; flex-direction: column;
+      overflow: hidden; min-width: 0;
+      padding-top: 28px; /* coord strip */
+    }
+
+    /* ── Page header ──────────────────────────────────────── */
+    #page-header {
+      padding: 16px 22px 14px;
+      border-bottom: 1px solid #262626;
+      display: flex; align-items: flex-start; justify-content: space-between;
+      flex-shrink: 0;
+    }
+    .page-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700; font-size: 2rem;
+      color: #ffb4a8; line-height: 1; margin: 0 0 8px;
+    }
+    .thread-id {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase;
+      color: #a1a1a1;
+    }
+    .thread-status { font-weight: 700; }
+
+    .header-stats {
+      display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+      flex-shrink: 0; margin-left: 24px;
+    }
+    .stat-block { display: flex; flex-direction: column; align-items: flex-end; }
+    .stat-label { font-family:'JetBrains Mono',monospace; font-size:0.6rem; letter-spacing:0.12em; text-transform:uppercase; color:#a1a1a1; margin-bottom:3px; }
+    .stat-value { font-family:'JetBrains Mono',monospace; font-size:1.25rem; font-weight:700; line-height:1; color:#e5e2e1; }
+    .stat-value.critical { color: #cc0000; }
+
+    /* ── Content grid ─────────────────────────────────────── */
+    #content-grid {
+      flex: 1; display: grid;
+      grid-template-columns: 1fr 240px;
+      grid-template-rows: 1fr 88px 160px;
+      overflow: hidden; min-height: 0;
+    }
+
+    /* ══════════════════════════════════════════════════════
+       SENTIMENT SPECTRUM PANEL — top left
+    ══════════════════════════════════════════════════════ */
+    #sentiment-panel {
+      grid-column: 1; grid-row: 1;
+      border-right: 1px solid #262626;
+      border-bottom: 1px solid #262626;
+      display: flex; flex-direction: column;
+      background: #0e0e0e; overflow: hidden;
+    }
+    .panel-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 7px 14px; border-bottom: 1px solid #262626;
+      flex-shrink: 0; background: #131313;
+    }
+    .ph-left  { font-family:'JetBrains Mono',monospace; font-size:0.6rem; letter-spacing:0.12em; text-transform:uppercase; color:#a1a1a1; }
+    .ph-right { font-family:'JetBrains Mono',monospace; font-size:0.6rem; letter-spacing:0.06em; color:#a1a1a1; }
+    #sentiment-chart-wrap {
+      flex: 1; position: relative; overflow: hidden; padding: 8px 14px 0;
+    }
+    #sentiment-svg { width: 100%; height: 100%; display: block; }
+    #sentiment-metrics {
+      display: grid; grid-template-columns: repeat(4, 1fr);
+      border-top: 1px solid #262626; flex-shrink: 0;
+    }
+    .sm-col {
+      padding: 8px 14px;
+      border-right: 1px solid #262626;
+    }
+    .sm-col:last-child { border-right: none; }
+    .sm-label { font-family:'JetBrains Mono',monospace; font-size:0.55rem; letter-spacing:0.1em; text-transform:uppercase; color:#a1a1a1; margin-bottom:4px; }
+    .sm-value { font-family:'JetBrains Mono',monospace; font-size:1.1rem; font-weight:700; color:#e5e2e1; line-height:1; }
+
+    /* ══════════════════════════════════════════════════════
+       INTERACTION DENSITY PANEL — top right
+    ══════════════════════════════════════════════════════ */
+    #density-panel {
+      grid-column: 2; grid-row: 1;
+      border-bottom: 1px solid #262626;
+      display: flex; flex-direction: column;
+      background: #0e0e0e; overflow: hidden;
+    }
+    #heatmap-grid {
+      flex: 1; padding: 12px 14px 8px;
+      display: flex; flex-direction: column;
+      justify-content: center; gap: 3px;
+    }
+    .hm-row { display: flex; gap: 3px; }
+    .hm-cell {
+      width: 100%; aspect-ratio: 1;
+      flex: 1;
+    }
+    #density-stats {
+      border-top: 1px solid #262626;
+      padding: 8px 14px; flex-shrink: 0;
+      display: flex; flex-direction: column; gap: 5px;
+    }
+    .ds-row {
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .ds-label { font-family:'JetBrains Mono',monospace; font-size:0.55rem; letter-spacing:0.1em; text-transform:uppercase; color:#a1a1a1; }
+    .ds-value { font-family:'JetBrains Mono',monospace; font-size:1rem; font-weight:700; color:#e5e2e1; line-height:1; }
+
+    /* ══════════════════════════════════════════════════════
+       KEY ACTOR PROFILES — middle row, full width
+    ══════════════════════════════════════════════════════ */
+    #profiles-row {
+      grid-column: 1 / 3; grid-row: 2;
+      border-bottom: 1px solid #262626;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    #profiles-header {
+      padding: 6px 14px;
+      border-bottom: 1px solid #262626;
+      flex-shrink: 0; background: #131313;
+    }
+    .profiles-label { font-family:'JetBrains Mono',monospace; font-size:0.6rem; letter-spacing:0.12em; text-transform:uppercase; color:#a1a1a1; }
+    #profiles-cards {
+      flex: 1; display: grid; grid-template-columns: repeat(3, 1fr);
+      overflow: hidden;
+    }
+    .profile-card {
+      background: #0e0e0e;
+      border-right: 1px solid #262626;
+      padding: 10px 14px;
+      display: flex; flex-direction: column; gap: 6px;
+      overflow: hidden;
+    }
+    .profile-card:last-child { border-right: none; }
+    .profile-top {
+      display: flex; align-items: center; gap: 10px;
+      flex-shrink: 0;
+    }
+    .profile-avatar {
+      width: 28px; height: 28px;
+      background: #262626; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .profile-avatar-initials {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.55rem; color: #a1a1a1; text-transform: uppercase;
+    }
+    .profile-info { display: flex; flex-direction: column; gap: 3px; }
+    .profile-handle {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 600; font-size: 0.75rem; color: #e5e2e1;
+    }
+    .profile-role-chip {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.5rem; letter-spacing: 0.1em; text-transform: uppercase;
+      color: #cc0000; border: 1px solid #cc0000;
+      padding: 1px 5px; background: transparent;
+      display: inline-block; line-height: 1.4;
+    }
+    .profile-metric { flex-shrink: 0; }
+    .metric-header-row {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 3px;
+    }
+    .metric-lbl { font-family:'JetBrains Mono',monospace; font-size:0.55rem; letter-spacing:0.1em; text-transform:uppercase; color:#a1a1a1; }
+    .metric-pct { font-family:'JetBrains Mono',monospace; font-size:0.6rem; color:#cc0000; }
+    .metric-track { width:100%; height:1px; background:#262626; position:relative; }
+    .metric-fill  { height:1px; background:#cc0000; position:absolute; top:0; left:0; }
+
+    /* ══════════════════════════════════════════════════════
+       LIVE ANALYSIS FEED — bottom full-width
+    ══════════════════════════════════════════════════════ */
+    #feed-panel {
+      grid-column: 1 / 3; grid-row: 3;
+      display: flex; flex-direction: column;
+      background: #0e0e0e; overflow: hidden;
+    }
+    #feed-header {
+      padding: 6px 14px; border-bottom: 1px solid #262626;
+      flex-shrink: 0; background: #131313;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .feed-live-sq { width: 7px; height: 7px; background: #cc0000; flex-shrink: 0; }
+    .feed-title { font-family:'JetBrains Mono',monospace; font-size:0.6rem; letter-spacing:0.12em; text-transform:uppercase; color:#e5e2e1; }
+    #feed-body {
+      flex: 1; overflow-y: auto; padding: 6px 14px;
+      display: flex; flex-direction: column; gap: 0;
+    }
+    #feed-body::-webkit-scrollbar { width: 3px; }
+    #feed-body::-webkit-scrollbar-track { background: #0e0e0e; }
+    #feed-body::-webkit-scrollbar-thumb { background: #262626; }
+    .feed-line {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem; line-height: 1.65;
+      white-space: nowrap; letter-spacing: 0.04em;
+    }
+    .f-ts      { color: #5e3f3a; }
+    .f-info    { color: #a1a1a1; }
+    .f-alert   { color: #cc0000; font-weight: 700; }
+    .f-critical{ color: #cc0000; font-weight: 700; }
+    .f-body    { color: #a1a1a1; }
+    .f-em      { color: #e5e2e1; }
+  </style>
+</head>
+<body>
+
+  <!-- ════════════════════════════════════════════════════════
+       TOP NAVBAR
+  ═════════════════════════════════════════════════════════ -->
+  <nav id="navbar" aria-label="Dashboard navigation">
+    <div id="nav-brand">
+      <a href="/" aria-label="Return to GLYPH home">GLYPH</a>
+    </div>
+    <div id="nav-search" role="search">
+      <input
+        type="search"
+        placeholder="QUERY_THREADS..."
+        autocomplete="off"
+        spellcheck="false"
+        aria-label="Query debate threads"
+      />
+    </div>
+    <div id="nav-icons" aria-label="Dashboard actions">
+      <!-- Contributors -->
+      <button class="nav-icon-btn" aria-label="Contributors" title="Contributors">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+          <circle cx="5" cy="4" r="2" stroke="currentColor" stroke-width="1"/>
+          <circle cx="9" cy="4" r="2" stroke="currentColor" stroke-width="1"/>
+          <path d="M1 11c0-2 1.8-3 4-3s4 1 4 3" stroke="currentColor" stroke-width="1" fill="none"/>
+          <path d="M9 8c1.5 0 3 0.8 3 3" stroke="currentColor" stroke-width="1" fill="none"/>
+        </svg>
+      </button>
+      <!-- Mail -->
+      <button class="nav-icon-btn" aria-label="Messages" title="Mail">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+          <rect x="1" y="2.5" width="11" height="8" stroke="currentColor" stroke-width="1"/>
+          <polyline points="1,2.5 6.5,7.5 12,2.5" stroke="currentColor" stroke-width="1" fill="none"/>
+        </svg>
+      </button>
+      <!-- Signal -->
+      <button class="nav-icon-btn" aria-label="Signal strength" title="Signal">
+        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+          <rect x="1"  y="8"  width="2" height="4" fill="currentColor"/>
+          <rect x="4"  y="6"  width="2" height="6" fill="currentColor"/>
+          <rect x="7"  y="4"  width="2" height="8" fill="currentColor"/>
+          <rect x="10" y="2"  width="2" height="10" fill="currentColor" opacity="0.4"/>
+        </svg>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ════════════════════════════════════════════════════════
+       COORD STRIP (below navbar, left of sidebar)
+  ═════════════════════════════════════════════════════════ -->
+  <div id="coord-strip" aria-label="Repository coordinates">
+    <span class="coord-protocol">CHARCOAL_PROTOCOL</span>
+    <span class="coord-sep" aria-hidden="true">·</span>
+    <span class="coord-val">COORD: {repoOwner} / {repoName}</span>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════
+       LAYOUT
+  ═════════════════════════════════════════════════════════ -->
+  <div id="layout">
+
+    <!-- ── LEFT SIDEBAR ─────────────────────────────────── -->
+    <aside id="sidebar" aria-label="Navigation sidebar">
+      <nav class="sidebar-nav" aria-label="Analysis sections">
+
+        <button class="nav-item active" aria-current="page" aria-label="Recon — active">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <rect x="0" y="0" width="10" height="10" stroke="currentColor" stroke-width="1" fill="none"/>
+            <rect x="2" y="2" width="6" height="6" fill="currentColor"/>
+          </svg>
+          RECON
+        </button>
+
+        <a href={`/repo/${id}`} class="nav-item" aria-label="VCS Log">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <circle cx="2" cy="2" r="1.5" stroke="currentColor" stroke-width="1"/>
+            <circle cx="2" cy="8" r="1.5" stroke="currentColor" stroke-width="1"/>
+            <circle cx="8" cy="5" r="1.5" stroke="currentColor" stroke-width="1"/>
+            <line x1="2" y1="3.5" x2="2" y2="6.5" stroke="currentColor" stroke-width="1"/>
+            <path d="M 2,6.5 C 2,8 8,8 8,6.5" stroke="currentColor" stroke-width="1" fill="none"/>
+          </svg>
+          VCS_LOG
+        </a>
+
+        <a href="#" class="nav-item" aria-label="Decrypt">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <rect x="2" y="4" width="6" height="5" stroke="currentColor" stroke-width="1" fill="none"/>
+            <path d="M3,4 L3,3 C3,1.3 7,1.3 7,3 L7,4" stroke="currentColor" stroke-width="1" fill="none"/>
+          </svg>
+          DECRYPT
+        </a>
+
+        <a href="#" class="nav-item" aria-label="Index">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <line x1="1" y1="2" x2="9" y2="2" stroke="currentColor" stroke-width="1"/>
+            <line x1="1" y1="5" x2="7" y2="5" stroke="currentColor" stroke-width="1"/>
+            <line x1="1" y1="8" x2="5" y2="8" stroke="currentColor" stroke-width="1"/>
+          </svg>
+          INDEX
+        </a>
+
+        <a href="#" class="nav-item" aria-label="Network">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <rect x="4" y="0" width="2" height="2" fill="currentColor"/>
+            <rect x="0" y="4" width="2" height="2" fill="currentColor"/>
+            <rect x="8" y="4" width="2" height="2" fill="currentColor"/>
+            <line x1="5" y1="2" x2="5" y2="4" stroke="currentColor" stroke-width="1"/>
+            <line x1="2" y1="5" x2="4" y2="5" stroke="currentColor" stroke-width="1"/>
+            <line x1="6" y1="5" x2="8" y2="5" stroke="currentColor" stroke-width="1"/>
+          </svg>
+          NETWORK
+        </a>
+
+      </nav>
+
+      <div class="sidebar-footer">
+        <button id="execute-fetch" type="button" aria-label="Execute fetch">EXECUTE_FETCH</button>
+        <div class="util-row">
+          <button class="util-btn" aria-label="System log">
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
+              <rect x="0" y="0" width="8" height="8" stroke="currentColor" stroke-width="1" fill="none"/>
+              <line x1="1.5" y1="2.5" x2="6.5" y2="2.5" stroke="currentColor" stroke-width="0.8"/>
+              <line x1="1.5" y1="4"   x2="6.5" y2="4"   stroke="currentColor" stroke-width="0.8"/>
+              <line x1="1.5" y1="5.5" x2="4.5" y2="5.5" stroke="currentColor" stroke-width="0.8"/>
+            </svg>
+            SYS_LOG
+          </button>
+          <button class="util-btn" aria-label="Terminate session">
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
+              <line x1="1" y1="1" x2="7" y2="7" stroke="currentColor" stroke-width="1"/>
+              <line x1="7" y1="1" x2="1" y2="7" stroke="currentColor" stroke-width="1"/>
+            </svg>
+            TERMINATE
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ── MAIN AREA ─────────────────────────────────────── -->
+    <div id="main-area">
+
+      <!-- Page header -->
+      <header id="page-header">
+        <div>
+          <h1 class="page-title">DEBATE_EXPLORER.V4</h1>
+          <p class="thread-id">
+            THREAD_ID: PR_{debateThread.prNumber}_{debateThread.topic}
+            <span style="margin: 0 8px; color: #262626;">//</span>
+            STATUS: <span class="thread-status" style={`color: ${statusColor}`}>{debateThread.status}</span>
+          </p>
+        </div>
+        <div class="header-stats" aria-label="Analysis metrics">
+          <div class="stat-block" aria-label="Throttle level: 98.4 percent">
+            <span class="stat-label">THROTTLE_LEVEL</span>
+            <span class="stat-value">98.4%</span>
+          </div>
+          <div class="stat-block" aria-label="Risk index: Critical">
+            <span class="stat-label">RISK_INDEX</span>
+            <span class="stat-value critical">CRITICAL</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Content grid -->
+      <div id="content-grid">
+
+        <!-- ── SENTIMENT SPECTRUM ──────────────────────── -->
+        <section id="sentiment-panel" aria-labelledby="sentiment-label">
+          <div class="panel-header">
+            <span class="ph-left" id="sentiment-label">SENTIMENT_SPECTRUM</span>
+            <span class="ph-right">WINDOW: 128H</span>
+          </div>
+          <div id="sentiment-chart-wrap">
+            <svg id="sentiment-svg" aria-label="Sentiment activity bar chart" role="img"></svg>
+          </div>
+          <div id="sentiment-metrics">
+            <div class="sm-col" aria-label={`Agreement: ${sentimentMetrics.agreement}%`}>
+              <div class="sm-label">AGREEMENT</div>
+              <div class="sm-value">{sentimentMetrics.agreement}%</div>
+            </div>
+            <div class="sm-col" aria-label={`Contention: ${sentimentMetrics.contention}%`}>
+              <div class="sm-label">CONTENTION</div>
+              <div class="sm-value">{sentimentMetrics.contention}%</div>
+            </div>
+            <div class="sm-col" aria-label={`Redundancy: ${sentimentMetrics.redundancy}%`}>
+              <div class="sm-label">REDUNDANCY</div>
+              <div class="sm-value">{sentimentMetrics.redundancy}%</div>
+            </div>
+            <div class="sm-col" aria-label={`Unresolved: ${sentimentMetrics.unresolved}%`}>
+              <div class="sm-label">UNRESOLVED</div>
+              <div class="sm-value">{sentimentMetrics.unresolved}%</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── INTERACTION DENSITY ────────────────────── -->
+        <aside id="density-panel" aria-labelledby="density-label">
+          <div class="panel-header">
+            <span class="ph-left" id="density-label">INTERACTION_DENSITY</span>
+          </div>
+          <div id="heatmap-grid" aria-label="Contributor interaction heatmap" role="img">
+            {heatValues.map((row, ri) => (
+              <div class="hm-row">
+                {row.map((val, ci) => {
+                  // Threshold-based fill: >0.55 → red, else dark grey
+                  const bg = val > 0.55 ? '#cc0000' : val > 0.3 ? '#2a2a2a' : '#1a1a1a';
+                  const opacity = val > 0.55 ? (0.4 + val * 0.6).toFixed(2) : '1';
+                  return (
+                    <div
+                      class="hm-cell"
+                      style={`background:${bg};opacity:${opacity};`}
+                      aria-hidden="true"
+                    ></div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+          <div id="density-stats">
+            <div class="ds-row" aria-label={`Total comments: ${heatmapStats.totalComments}`}>
+              <span class="ds-label">TOTAL_COMMENTS:</span>
+              <span class="ds-value">{heatmapStats.totalComments}</span>
+            </div>
+            <div class="ds-row" aria-label={`Average depth: ${heatmapStats.averageDepth}`}>
+              <span class="ds-label">AVERAGE_DEPTH:</span>
+              <span class="ds-value">{heatmapStats.averageDepth}</span>
+            </div>
+          </div>
+        </aside>
+
+        <!-- ── KEY ACTOR PROFILES ──────────────────────── -->
+        <section id="profiles-row" aria-labelledby="profiles-label">
+          <div id="profiles-header">
+            <span class="profiles-label" id="profiles-label">KEY_ACTOR_PROFILES</span>
+          </div>
+          <div id="profiles-cards" role="list" aria-label="Key contributor profiles">
+            {contributors.map((c) => {
+              const initials = c.handle.split('_').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+              return (
+                <div class="profile-card" role="listitem" aria-label={`Contributor: ${c.handle}`}>
+                  <div class="profile-top">
+                    <div class="profile-avatar" aria-hidden="true">
+                      <span class="profile-avatar-initials">{initials}</span>
+                    </div>
+                    <div class="profile-info">
+                      <span class="profile-handle">{c.handle}</span>
+                      <span class="profile-role-chip" role="status">{c.role}</span>
+                    </div>
+                  </div>
+                  <div class="profile-metric" aria-label={`${c.metric.label}: ${c.metric.pct}%`}>
+                    <div class="metric-header-row">
+                      <span class="metric-lbl">{c.metric.label}</span>
+                      <span class="metric-pct">{c.metric.pct}%</span>
+                    </div>
+                    <div class="metric-track" aria-hidden="true">
+                      <div class="metric-fill" style={`width:${c.metric.pct}%`}></div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        <!-- ── LIVE ANALYSIS FEED ──────────────────────── -->
+        <section id="feed-panel" aria-labelledby="feed-title">
+          <div id="feed-header">
+            <span class="feed-live-sq" aria-hidden="true"></span>
+            <span class="feed-title" id="feed-title">LIVE_ANALYSIS_FEED</span>
+          </div>
+          <div id="feed-body" role="log" aria-label="Live analysis feed" aria-live="polite">
+            <div class="feed-line">
+              <span class="f-ts">[14:22:01]</span>
+              <span class="f-info"> INFO: </span>
+              <span class="f-body">Scanning PR thread <span class="f-em">#{debateThread.prNumber}</span>...</span>
+            </div>
+            <div class="feed-line">
+              <span class="f-ts">[14:22:03]</span>
+              <span class="f-alert"> ALERT: </span>
+              <span class="f-body">High-frequency interaction detected between <span class="f-em">'{contributors[0].handle}'</span> and <span class="f-em">'{contributors[1].handle}'</span>.</span>
+            </div>
+            <div class="feed-line">
+              <span class="f-ts">[14:22:05]</span>
+              <span class="f-info"> ANALYSIS: </span>
+              <span class="f-body">Debate centered on <span class="f-em">AUTH_REDESIGN</span> in commit <span class="f-em">0xf3a91c2</span>.</span>
+            </div>
+            <div class="feed-line">
+              <span class="f-ts">[14:22:08]</span>
+              <span class="f-info"> DATA: </span>
+              <span class="f-body">Contention index rising: <span class="f-em">+7%</span> in last 10 minutes.</span>
+            </div>
+            <div class="feed-line">
+              <span class="f-ts">[14:22:12]</span>
+              <span class="f-info"> INFO: </span>
+              <span class="f-body">Generating intent node for <span class="f-em">decision_id: #ARCHITECTURAL_DECISION_007</span>...</span>
+            </div>
+            <div class="feed-line">
+              <span class="f-ts">[14:22:15]</span>
+              <span class="f-critical"> CRITICAL: </span>
+              <span class="f-body">Position conflict in <span class="f-em">'{contributors[1].handle}'</span> argument. Dismissive tone flagged.</span>
+            </div>
+            <div class="feed-line">
+              <span class="f-ts">[14:22:18]</span>
+              <span class="f-info"> LOG: </span>
+              <span class="f-body">Buffer synchronized. Waiting for next payload...</span>
+            </div>
+          </div>
+        </section>
+
+      </div><!-- /content-grid -->
+    </div><!-- /main-area -->
+  </div><!-- /layout -->
+
+  <!-- ════════════════════════════════════════════════════════
+       SCRIPTS
+  ═════════════════════════════════════════════════════════ -->
+  <script define:vars={{ sentimentBars, prNumber: debateThread.prNumber, contributors }}>
+    const API_BASE = (window as any).__GLYPH_API__ ?? (import.meta as any).env?.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+    // ── Execute fetch ─────────────────────────────────────
+    (function() {
+      const btn = document.getElementById('execute-fetch');
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        btn.textContent = 'FETCHING...';
+        setTimeout(() => { btn.textContent = 'EXECUTE_FETCH'; }, 2000);
+      });
+    })();
+
+    // ── Hydrate metrics from real API ─────────────────────
+    (function hydrateDebates() {
+      const pathParts = window.location.pathname.split('/').filter(Boolean);
+      const jobId     = pathParts[1] ?? '';
+      const uuidRe    = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRe.test(jobId)) return;
+
+      fetch(`${API_BASE}/api/repo/${jobId}/debates`)
+        .then(r => r.ok ? r.json() : null)
+        .then(data => {
+          if (!data?.metrics) return;
+          const m = data.metrics;
+          const cols = document.querySelectorAll('.sm-value');
+          if (cols[0]) cols[0].textContent = `${m.agreement_pct ?? 18}%`;
+          if (cols[1]) cols[1].textContent = `${m.contention_pct ?? 54}%`;
+        })
+        .catch(() => {});
+    })();
+
+    // ── Live analysis feed ────────────────────────────────
+    (function initFeed() {
+      const body = document.getElementById('feed-body');
+      if (!body) return;
+
+      function nowTs() {
+        const d = new Date();
+        const h = String(d.getHours()).padStart(2, '0');
+        const m = String(d.getMinutes()).padStart(2, '0');
+        const s = String(d.getSeconds()).padStart(2, '0');
+        return `[${h}:${m}:${s}]`;
+      }
+
+      const handles = contributors.map(c => c.handle);
+      const shas    = ['0xf3a91c2', '0xa9e3f14', '0x2c4d801', '0x7b1c339', '0x1d5a0c8'];
+      const topics  = ['AUTH_REDESIGN', 'DB_SCHEMA_V3', 'API_GATEWAY', 'NIM_PIPELINE', 'INGESTION_LAYER'];
+      let   decIdx  = 7;
+      let   ri = 0, si = 0, ti = 0;
+
+      type Level = 'INFO' | 'ALERT' | 'ANALYSIS' | 'DATA' | 'LOG' | 'CRITICAL';
+
+      const pool: Array<() => { level: Level; body: string }> = [
+        () => ({ level: 'INFO',     body: `Scanning PR thread <span class="f-em">#${prNumber + ri++}</span>...` }),
+        () => ({ level: 'ALERT',    body: `High-frequency interaction: <span class="f-em">'${handles[0]}'</span> and <span class="f-em">'${handles[1]}'</span>.` }),
+        () => ({ level: 'ANALYSIS', body: `Debate centered on <span class="f-em">${topics[ti++ % topics.length]}</span> in commit <span class="f-em">${shas[si++ % shas.length]}</span>.` }),
+        () => ({ level: 'DATA',     body: `Contention index rising: <span class="f-em">+${Math.floor(Math.random()*12+2)}%</span> in last 10 minutes.` }),
+        () => ({ level: 'INFO',     body: `Generating intent node for <span class="f-em">decision_id: #ARCHITECTURAL_DECISION_${String(decIdx++).padStart(3,'0')}</span>...` }),
+        () => ({ level: 'CRITICAL', body: `Position conflict in <span class="f-em">'${handles[1]}'</span> argument. Dismissive tone flagged.` }),
+        () => ({ level: 'LOG',      body: `Buffer synchronized. Waiting for next payload...` }),
+        () => ({ level: 'DATA',     body: `NIM response latency: <span class="f-em">${Math.floor(Math.random()*80+120)}ms</span>.` }),
+        () => ({ level: 'INFO',     body: `Extracting contributor reasoning: <span class="f-em">${handles[ri % handles.length]}</span>.` }),
+        () => ({ level: 'ANALYSIS', body: `Rejection candidate flagged: <span class="f-em">ABANDONED_FEATURE_0${String(Math.floor(Math.random()*20)+1).padStart(2,'0')}</span>.` }),
+      ];
+
+      let poolIdx = 0;
+      const cls: Record<Level, string> = {
+        INFO: 'f-info', ALERT: 'f-alert', ANALYSIS: 'f-info',
+        DATA: 'f-info', LOG: 'f-info', CRITICAL: 'f-critical',
+      };
+
+      setInterval(() => {
+        const entry = pool[poolIdx % pool.length]();
+        poolIdx++;
+        const line = document.createElement('div');
+        line.className = 'feed-line';
+        line.innerHTML = `<span class="f-ts">${nowTs()}</span><span class="${cls[entry.level]}"> ${entry.level}: </span><span class="f-body">${entry.body}</span>`;
+        body.appendChild(line);
+        body.scrollTop = body.scrollHeight;
+        while (body.children.length > 40) { body.removeChild(body.firstChild); }
+      }, 2000);
+    })();
+  </script>
+
+  <!-- ── D3 Sentiment bar chart ─────────────────────────── -->
+  <script type="module" define:vars={{ sentimentBars }}>
+    import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
+
+    const wrap = document.getElementById('sentiment-chart-wrap');
+    if (!wrap) throw new Error();
+
+    const W   = wrap.offsetWidth  || 400;
+    const H   = wrap.offsetHeight || 120;
+    const PAD = { top: 10, right: 4, bottom: 4, left: 4 };
+
+    const svg = d3.select('#sentiment-svg')
+      .attr('viewBox', `0 0 ${W} ${H}`)
+      .attr('preserveAspectRatio', 'none');
+
+    const data   = sentimentBars;
+    const maxVal = d3.max(data) ?? 1;
+
+    const x = d3.scaleBand()
+      .domain(data.map((_, i) => String(i)))
+      .range([PAD.left, W - PAD.right])
+      .padding(0.25);
+
+    const y = d3.scaleLinear()
+      .domain([0, maxVal])
+      .range([H - PAD.bottom, PAD.top]);
+
+    // Dotted horizontal gridlines only — 4 levels
+    const gridVals = [0.25, 0.5, 0.75, 1.0].map(f => f * maxVal);
+    svg.append('g').selectAll('line')
+      .data(gridVals)
+      .enter()
+      .append('line')
+      .attr('x1', PAD.left)
+      .attr('x2', W - PAD.right)
+      .attr('y1', d => y(d))
+      .attr('y2', d => y(d))
+      .attr('stroke', '#262626')
+      .attr('stroke-width', 1)
+      .attr('stroke-dasharray', '3 3');
+
+    // Bars — filled #cc0000, no radius
+    svg.append('g').selectAll('rect')
+      .data(data)
+      .enter()
+      .append('rect')
+      .attr('x',      (_, i) => x(String(i)) ?? 0)
+      .attr('y',      d => y(d))
+      .attr('width',  x.bandwidth())
+      .attr('height', d => H - PAD.bottom - y(d))
+      .attr('fill',   '#cc0000');
+  </script>
+
+</body>
+</html>

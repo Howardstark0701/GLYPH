@@ -1,0 +1,26 @@
+---
+---
+
+<div id="decision-graph" class="w-full h-96"></div>
+
+<script>
+  import * as d3 from 'd3';
+
+  const container = document.getElementById('decision-graph');
+  if (container) {
+    const width = container.clientWidth;
+    const height = 384;
+
+    const svg = d3.select(container)
+      .append('svg')
+      .attr('width', width)
+      .attr('height', height);
+
+    svg.append('text')
+      .attr('x', width / 2)
+      .attr('y', height / 2)
+      .attr('text-anchor', 'middle')
+      .attr('fill', '#4B5563')
+      .text('Decision graph will render here after analysis');
+  }
+</script>
