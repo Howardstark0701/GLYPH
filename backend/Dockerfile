@@ -1,5 +1,5 @@
 # ── Stage 1: Build ────────────────────────────────────────
-FROM rust:1.82-slim AS builder
+FROM rust:1.85-slim AS builder
 
 # System deps for sqlx (OpenSSL, pkg-config)
 RUN apt-get update && apt-get install -y \
