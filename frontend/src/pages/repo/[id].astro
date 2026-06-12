@@ -543,6 +543,94 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
     #stream-body::-webkit-scrollbar { width: 3px; }
     #stream-body::-webkit-scrollbar-track { background: #0e0e0e; }
     #stream-body::-webkit-scrollbar-thumb { background: #262626; }
+
+    /* ── Global custom scrollbar (terminal feel) ──────────── */
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: #0e0e0e; }
+    ::-webkit-scrollbar-thumb { background: #353535; }
+    ::-webkit-scrollbar-thumb:hover { background: #cc0000; }
+
+    /* ── Page title glitch ────────────────────────────────── */
+    .page-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 1.6rem;
+      color: #e5e2e1;
+      line-height: 1;
+      margin: 0;
+      animation: glitch-title 5s infinite;
+    }
+    @keyframes glitch-title {
+      0%,  97%, 100% { transform: translate(0); }
+      98%             { transform: translate(-1px, 1px); }
+      99%             { transform: translate(1px, -1px); }
+    }
+
+    /* ── SVG node pulse ───────────────────────────────────── */
+    .node-pulse {
+      animation: node-pulse-anim 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes node-pulse-anim {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.3; }
+    }
+
+    /* ── Conflict map callout boxes ───────────────────────── */
+    .conflict-callout {
+      position: absolute;
+      padding: 6px 10px;
+      background: rgba(13, 13, 13, 0.85);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
+      z-index: 10;
+      cursor: crosshair;
+    }
+    .conflict-callout.active-branch { border: 1px solid #cc0000; }
+    .conflict-callout.passive-branch { border: 1px solid #262626; }
+    .callout-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #cc0000;
+      margin-bottom: 3px;
+    }
+    .callout-label.muted { color: #a1a1a1; }
+    .callout-hash {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.55rem;
+      color: #5e3f3a;
+    }
+    .callout-underline {
+      width: 48px;
+      height: 1px;
+      background: #cc0000;
+      margin-top: 6px;
+    }
+    .callout-underline.muted { background: #262626; }
+
+    /* ── Scanline overlay ─────────────────────────────────── */
+    #scanline-overlay {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 999;
+      overflow: hidden;
+      opacity: 0.03;
+    }
+    #scanline-bar {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 2px;
+      background: #ffb4a8;
+      animation: scanline 4s linear infinite;
+    }
+    @keyframes scanline {
+      from { top: 0; }
+      to   { top: 100%; }
+    }
   </style>
 </head>
 <body>
@@ -725,6 +813,26 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
           </div>
           <div id="graph-container" role="img" aria-label="Interactive decision graph">
             <svg id="graph-svg" aria-hidden="true"></svg>
+
+            <!-- Conflict callouts (visible until real graph loads) -->
+            <div class="conflict-callout active-branch" style="top:25%;left:30%;" aria-hidden="true">
+              <div class="callout-label">BRANCH_A // KERNEL</div>
+              <div class="callout-hash">H_HASH: 0x9f22...</div>
+              <div class="callout-underline"></div>
+            </div>
+            <div class="conflict-callout passive-branch" style="bottom:30%;right:22%;" aria-hidden="true">
+              <div class="callout-label muted">BRANCH_B // USER_AUTH</div>
+              <div class="callout-hash">H_HASH: 0xc41b...</div>
+              <div class="callout-underline muted"></div>
+            </div>
+
+            <!-- SVG connection between callouts -->
+            <svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.3;pointer-events:none;" aria-hidden="true">
+              <line x1="33%" y1="25%" x2="75%" y2="66%" stroke="#cc0000" stroke-width="1" stroke-dasharray="4"/>
+              <circle class="node-pulse" cx="33%" cy="25%" r="3" fill="#cc0000"/>
+              <circle cx="75%" cy="66%" r="3" fill="#cc0000"/>
+            </svg>
+
             <div id="graph-pagination" aria-label="Graph layer controls" role="group">
               <div class="page-dot active" role="button" tabindex="0" aria-label="Layer 1" aria-pressed="true"></div>
               <div class="page-dot" role="button" tabindex="0" aria-label="Layer 2" aria-pressed="false"></div>
@@ -1128,6 +1236,11 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
       nodeEl.attr('transform', (d: GNode) => `translate(${d.x ?? 0},${d.y ?? 0})`);
     });
   </script>
+
+  <!-- ── Scanline overlay (Stitch UI visual polish) ────────── -->
+  <div id="scanline-overlay" aria-hidden="true">
+    <div id="scanline-bar"></div>
+  </div>
 
 </body>
 </html>

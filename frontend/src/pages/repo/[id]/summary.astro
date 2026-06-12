@@ -289,9 +289,10 @@ const stats = { decisions: 12, debates: 7, rejections: 5 };
       border-right:1px solid #1a1a1a;
       overflow-y:auto; padding:0;
     }
-    #narrative-col::-webkit-scrollbar { width:3px; }
-    #narrative-col::-webkit-scrollbar-track { background:#131313; }
-    #narrative-col::-webkit-scrollbar-thumb { background:#1a1a1a; }
+    #narrative-col::-webkit-scrollbar { width: 4px; }
+    #narrative-col::-webkit-scrollbar-track { background: #0e0e0e; }
+    #narrative-col::-webkit-scrollbar-thumb { background: #cc0000; }
+    #narrative-col::-webkit-scrollbar-thumb:hover { background: #ff0000; }
 
     .narrative-section { padding:20px 24px 8px; }
     .narrative-section + .narrative-section { padding-top:16px; }
@@ -331,9 +332,10 @@ const stats = { decisions: 12, debates: 7, rejections: 5 };
       background:#131313; overflow-y:auto;
       display:flex; flex-direction:column;
     }
-    #ctrl-panel::-webkit-scrollbar { width:3px; }
-    #ctrl-panel::-webkit-scrollbar-track { background:#131313; }
-    #ctrl-panel::-webkit-scrollbar-thumb { background:#1a1a1a; }
+    #ctrl-panel::-webkit-scrollbar { width: 4px; }
+    #ctrl-panel::-webkit-scrollbar-track { background: #0e0e0e; }
+    #ctrl-panel::-webkit-scrollbar-thumb { background: #cc0000; }
+    #ctrl-panel::-webkit-scrollbar-thumb:hover { background: #ff0000; }
 
     .cp-section { padding:12px 14px; border-bottom:1px solid #1a1a1a; }
     .cp-section:last-child { border-bottom:none; }
@@ -428,9 +430,10 @@ const stats = { decisions: 12, debates: 7, rejections: 5 };
       flex:1; overflow-y:auto; padding:6px 14px;
       display:flex; flex-direction:column;
     }
-    #gen-log-body::-webkit-scrollbar { width:3px; }
-    #gen-log-body::-webkit-scrollbar-track { background:#0e0e0e; }
-    #gen-log-body::-webkit-scrollbar-thumb { background:#1a1a1a; }
+    #gen-log-body::-webkit-scrollbar { width: 4px; }
+    #gen-log-body::-webkit-scrollbar-track { background: #0e0e0e; }
+    #gen-log-body::-webkit-scrollbar-thumb { background: #cc0000; }
+    #gen-log-body::-webkit-scrollbar-thumb:hover { background: #ff0000; }
     .g-line {
       font-family:'JetBrains Mono',monospace; font-size:0.6rem;
       line-height:1.65; white-space:nowrap; color:#a1a1a1; letter-spacing:0.04em;
@@ -445,6 +448,45 @@ const stats = { decisions: 12, debates: 7, rejections: 5 };
       font-family:'JetBrains Mono',monospace; font-size:0.5rem;
       color:#3a3a3a; letter-spacing:0.06em; pointer-events:none;
     }
+
+    /* ── Scanline overlay ─────────────────────────────────── */
+    #scanline-overlay {
+      position: fixed; inset: 0;
+      pointer-events: none; z-index: 999; overflow: hidden; opacity: 0.04;
+    }
+    #scanline-bar {
+      position: absolute; top: 0; left: 0;
+      width: 100%; height: 2px;
+      background: rgba(204, 0, 0, 0.8);
+      animation: scan-anim 8s linear infinite;
+    }
+    @keyframes scan-anim { from { top: 0; } to { top: 100%; } }
+
+    /* ── Pulsing status dots (Report_Status panel) ────────── */
+    .status-dot {
+      width: 5px; height: 5px; background: #cc0000;
+      display: inline-block;
+    }
+    .status-dot.pulse { animation: dot-pulse 2s ease-in-out infinite; }
+    .status-dot.dim   { background: #262626; }
+    @keyframes dot-pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.2; }
+    }
+
+    /* ── Decorative dot grid ──────────────────────────────── */
+    .dot-grid {
+      display: flex; flex-wrap: wrap;
+      opacity: 0.2; pointer-events: none;
+    }
+    .dot-grid-cell {
+      width: 2px; height: 2px;
+      background: #474746; margin: 3px;
+    }
+
+    /* ── Gen log > prefix format ──────────────────────────── */
+    .g-gt { color: #5e3f3a; margin-right: 4px; }
+    .g-tag-success { color: #a1a1a1; font-weight: 700; }
   </style>
 </head>
 <body>
@@ -632,7 +674,14 @@ const stats = { decisions: 12, debates: 7, rejections: 5 };
 
           <!-- Report status -->
           <div class="cp-section">
-            <span class="cp-label">REPORT_STATUS</span>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+              <span class="cp-label" style="margin-bottom:0;">REPORT_STATUS</span>
+              <div style="display:flex;gap:3px;align-items:center;">
+                <span class="status-dot pulse" aria-hidden="true"></span>
+                <span class="status-dot" aria-hidden="true"></span>
+                <span class="status-dot dim" aria-hidden="true"></span>
+              </div>
+            </div>
             <div class="status-row" aria-label="Integrity: 98.4%">
               <span class="status-key">INTEGRITY</span>
               <span class="status-val" id="integrity-val">98.4%</span>
@@ -679,6 +728,11 @@ const stats = { decisions: 12, debates: 7, rejections: 5 };
             </div>
           </div>
 
+          <!-- Decorative dot grid -->
+          <div class="cp-section" style="padding:10px 14px;">
+            <div class="dot-grid" id="dot-grid" aria-hidden="true" style="height:80px;overflow:hidden;"></div>
+          </div>
+
         </aside>
 
         <!-- ── GENERATION LOG ─────────────────────────── -->
@@ -694,9 +748,11 @@ const stats = { decisions: 12, debates: 7, rejections: 5 };
           </div>
           <div id="gen-log-body" role="log" aria-label="NIM generation log" aria-live="polite">
             <!-- Seed lines matching screenshot -->
-            <div class="g-line"><span class="g-prefix">&gt; </span><span class="g-tag-info">[INFO] FETCHING_REPOSITORY_METADATA ... 200 OK</span></div>
-            <div class="g-line"><span class="g-prefix">&gt; </span><span class="g-tag-warn">[WARN] ANOMALOUS_COMMIT_PATTERN DETECTED in branch <span class="g-em">'master'</span></span></div>
-            <div class="g-line"><span class="g-prefix">&gt; </span><span class="g-tag-info">[INFO] ASSEMBLING_INTEL_PACKAGE_ALPHA... <span class="g-em">COMPLETE</span></span></div>
+            <div class="g-line"><span class="g-gt">&gt;</span><span class="g-tag-info">[INFO] INITIALIZING_SUMMARY_GENERATOR... <span class="g-em">OK</span></span></div>
+            <div class="g-line"><span class="g-gt">&gt;</span><span class="g-tag-info">[INFO] FETCHING_REPOSITORY_METADATA... <span class="g-em">200 OK</span></span></div>
+            <div class="g-line"><span class="g-gt">&gt;</span><span class="g-tag-warn">[WARN] ANOMALOUS_COMMIT_PATTERN_DETECTED in branch <span class="g-em">'master'</span></span></div>
+            <div class="g-line"><span class="g-gt">&gt;</span><span class="g-tag-info">[INFO] ASSEMBLING_INTEL_PACKAGE_ALPHA... <span class="g-em">COMPLETE</span></span></div>
+            <div class="g-line"><span class="g-gt">&gt;</span><span class="g-tag-success">[SUCCESS] REPORT_READY_FOR_OPERATOR_REVIEW</span></div>
           </div>
           <span id="log-timestamp" aria-hidden="true">TERMINAL_FEED: 00:17:04</span>
         </section>
@@ -704,6 +760,11 @@ const stats = { decisions: 12, debates: 7, rejections: 5 };
       </div><!-- /content-area -->
     </div><!-- /main-area -->
   </div><!-- /layout -->
+
+  <!-- Scanline overlay -->
+  <div id="scanline-overlay" aria-hidden="true">
+    <div id="scanline-bar"></div>
+  </div>
 
   <!-- ════════════════════════════════════════════════════════
        SCRIPTS
@@ -732,17 +793,17 @@ const stats = { decisions: 12, debates: 7, rejections: 5 };
       if (!body) return;
 
       const pool = [
-        () => `<span class="g-prefix">&gt; </span><span class="g-tag-info">[NIM] Prompt tokens: <span class="g-em">${Math.floor(Math.random()*500+2800)}</span> — context window: 128k</span>`,
-        () => `<span class="g-prefix">&gt; </span><span class="g-tag-info">[NIM] Sampling temperature: 0.3 — max_tokens: 2048</span>`,
-        () => `<span class="g-prefix">&gt; </span><span class="g-tag-info">[PARSE] Section 01 // ORIGIN_AND_INTENT — <span class="g-em">extracted</span></span>`,
-        () => `<span class="g-prefix">&gt; </span><span class="g-tag-info">[PARSE] Section 02 // ARCHITECTURAL_EVOLUTION — <span class="g-em">extracted</span></span>`,
-        () => `<span class="g-prefix">&gt; </span><span class="g-tag-info">[PARSE] Section 03 // KEY_DECISIONS — <span class="g-em">${repoStats.decisions} nodes identified</span></span>`,
-        () => `<span class="g-prefix">&gt; </span><span class="g-tag-info">[PARSE] Section 04 // DEBATE_RECORD — <span class="g-em">${repoStats.debates} threads resolved</span></span>`,
-        () => `<span class="g-prefix">&gt; </span><span class="g-tag-info">[PARSE] Section 05 // REJECTION_VAULT — <span class="g-em">${repoStats.rejections} records sealed</span></span>`,
-        () => `<span class="g-prefix">&gt; </span><span class="g-tag-warn">[WARN] ANOMALOUS_COMMIT_PATTERN DETECTED in branch <span class="g-em">'master'</span></span>`,
-        () => `<span class="g-prefix">&gt; </span><span class="g-tag-info">[NIM] Response complete — confidence: <span class="g-em">98.4%</span></span>`,
-        () => `<span class="g-prefix">&gt; </span><span class="g-tag-info">[SYSTEM] Narrative written to report store</span>`,
-        () => `<span class="g-prefix">&gt; </span><span class="g-tag-info">[INFO] ASSEMBLING_INTEL_PACKAGE_ALPHA... <span class="g-em">COMPLETE</span></span>`,
+        () => `<span class="g-gt">&gt;</span><span class="g-tag-info">[NIM] Prompt tokens: <span class="g-em">${Math.floor(Math.random()*500+2800)}</span> — context window: 128k</span>`,
+        () => `<span class="g-gt">&gt;</span><span class="g-tag-info">[NIM] Sampling temperature: 0.3 — max_tokens: 2048</span>`,
+        () => `<span class="g-gt">&gt;</span><span class="g-tag-info">[PARSE] Section 01 // ORIGIN_AND_INTENT — <span class="g-em">extracted</span></span>`,
+        () => `<span class="g-gt">&gt;</span><span class="g-tag-info">[PARSE] Section 02 // ARCHITECTURAL_EVOLUTION — <span class="g-em">extracted</span></span>`,
+        () => `<span class="g-gt">&gt;</span><span class="g-tag-info">[PARSE] Section 03 // KEY_DECISIONS — <span class="g-em">${repoStats.decisions} nodes identified</span></span>`,
+        () => `<span class="g-gt">&gt;</span><span class="g-tag-info">[PARSE] Section 04 // DEBATE_RECORD — <span class="g-em">${repoStats.debates} threads resolved</span></span>`,
+        () => `<span class="g-gt">&gt;</span><span class="g-tag-info">[PARSE] Section 05 // REJECTION_VAULT — <span class="g-em">${repoStats.rejections} records sealed</span></span>`,
+        () => `<span class="g-gt">&gt;</span><span class="g-tag-warn">[WARN] ANOMALOUS_COMMIT_PATTERN_DETECTED in branch <span class="g-em">'master'</span></span>`,
+        () => `<span class="g-gt">&gt;</span><span class="g-tag-info">[NIM] Response complete — confidence: <span class="g-em">98.4%</span></span>`,
+        () => `<span class="g-gt">&gt;</span><span class="g-tag-success">[SUCCESS] REPORT_READY_FOR_OPERATOR_REVIEW</span>`,
+        () => `<span class="g-gt">&gt;</span><span class="g-tag-info">[INFO] ASSEMBLING_INTEL_PACKAGE_ALPHA... <span class="g-em">COMPLETE</span></span>`,
       ];
       let idx = 0;
       setInterval(() => {
@@ -877,6 +938,17 @@ const stats = { decisions: 12, debates: 7, rejections: 5 };
       document.getElementById('export-pdf-btn')?.addEventListener('click', () => {
         window.print();
       });
+    })();
+
+    // ── Decorative dot grid ───────────────────────────────
+    (function initDotGrid() {
+      const grid = document.getElementById('dot-grid');
+      if (!grid) return;
+      for (let i = 0; i < 300; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'dot-grid-cell';
+        grid.appendChild(dot);
+      }
     })();
   </script>
 

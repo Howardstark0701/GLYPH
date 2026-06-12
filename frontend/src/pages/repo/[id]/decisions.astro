@@ -239,9 +239,10 @@ const statusColor = (s: Decision['status']) =>
       overflow-y: auto; padding: 20px 24px 20px 20px;
       position: relative;
     }
-    #timeline-col::-webkit-scrollbar { width: 3px; }
-    #timeline-col::-webkit-scrollbar-track { background: #131313; }
-    #timeline-col::-webkit-scrollbar-thumb { background: #262626; }
+    #timeline-col::-webkit-scrollbar { width: 4px; }
+    #timeline-col::-webkit-scrollbar-track { background: #0e0e0e; }
+    #timeline-col::-webkit-scrollbar-thumb { background: #cc0000; }
+    #timeline-col::-webkit-scrollbar-thumb:hover { background: #ff0000; }
 
     /* Vertical timeline spine */
     .timeline-spine {
@@ -265,7 +266,9 @@ const statusColor = (s: Decision['status']) =>
     .decision-card {
       flex: 1; background: #0e0e0e; border: 1px solid #262626;
       padding: 0; overflow: hidden;
+      cursor: pointer;
     }
+    .decision-card:hover { border-color: rgba(204, 0, 0, 0.5); }
 
     .dc-top {
       display: flex; align-items: center; justify-content: space-between;
@@ -322,9 +325,10 @@ const statusColor = (s: Decision['status']) =>
       background: #131313; overflow-y: auto;
       display: flex; flex-direction: column;
     }
-    #intel-sidebar::-webkit-scrollbar { width: 3px; }
-    #intel-sidebar::-webkit-scrollbar-track { background: #131313; }
-    #intel-sidebar::-webkit-scrollbar-thumb { background: #262626; }
+    #intel-sidebar::-webkit-scrollbar { width: 4px; }
+    #intel-sidebar::-webkit-scrollbar-track { background: #0e0e0e; }
+    #intel-sidebar::-webkit-scrollbar-thumb { background: #cc0000; }
+    #intel-sidebar::-webkit-scrollbar-thumb:hover { background: #ff0000; }
 
     .intel-section {
       padding: 12px 14px; border-bottom: 1px solid #262626;
@@ -417,17 +421,24 @@ const statusColor = (s: Decision['status']) =>
       flex: 1; overflow-y: auto; padding: 6px 14px;
       display: flex; flex-direction: column; gap: 0;
     }
-    #stream-body::-webkit-scrollbar { width: 3px; }
+    #stream-body::-webkit-scrollbar { width: 4px; }
     #stream-body::-webkit-scrollbar-track { background: #0e0e0e; }
-    #stream-body::-webkit-scrollbar-thumb { background: #262626; }
+    #stream-body::-webkit-scrollbar-thumb { background: #cc0000; }
+    #stream-body::-webkit-scrollbar-thumb:hover { background: #ff0000; }
     .s-line {
       font-family:'JetBrains Mono',monospace; font-size:0.6rem;
       line-height:1.6; white-space:nowrap; color:#a1a1a1; letter-spacing:0.04em;
     }
-    .s-ts   { color: #5e3f3a; }
-    .s-tag  { color: #a1a1a1; }
-    .s-em   { color: #e5e2e1; }
-    .s-red  { color: #cc0000; }
+    .s-ts      { color: #5e3f3a; }
+    .s-tag     { color: #a1a1a1; }
+    .s-tag-sys { color: #cc0000; font-weight: 700; }
+    .s-em      { color: #e5e2e1; }
+    .s-red     { color: #cc0000; }
+    .s-pulse   { animation: pulse-opacity 2s ease-in-out infinite; }
+    @keyframes pulse-opacity {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
   </style>
 </head>
 <body>
@@ -700,15 +711,19 @@ const statusColor = (s: Decision['status']) =>
             <span class="stream-header-right">TOTAL: <span id="stream-total">{decisions.length}</span></span>
           </div>
           <div id="stream-body" role="log" aria-label="Decision stream" aria-live="polite">
-            {decisions.slice(0, 5).map((d) => (
+            <div class="s-line"><span class="s-tag-sys">[SYSTEM]</span><span class="s-tag"> BOOT_SEQUENCE: INITIALIZING DECISION_ENGINE_V4...</span></div>
+            <div class="s-line"><span class="s-tag">[AUTH]</span><span class="s-tag"> SESSION_TOKEN: VALIDATED for USER_OPERATOR</span></div>
+            <div class="s-line"><span class="s-tag">[FETCH]</span><span class="s-tag"> INDEXING REMOTE_LEDGER: decisions endpoint</span></div>
+            <div class="s-line"><span class="s-tag">[INDEX]</span><span class="s-em"> SUCCESS: {decisions.length} ENTRIES PARSED FROM COMMIT_LOG</span></div>
+            {decisions.slice(0, 4).map((d) => (
               <div class="s-line">
-                <span class="s-ts">[LOG]</span>
+                <span class="s-tag">[LOG]</span>
                 <span class="s-tag"> PARSING </span>
                 <span class="s-em">DECISION_{String(d.index).padStart(2,'0')}: {d.title}</span>
                 <span class="s-tag"> ({d.sha})</span>
               </div>
             ))}
-            <div class="s-line"><span class="s-ts">[LISTENING]</span><span class="s-tag"> AWAITING REAL-TIME ARCHITECTURAL EVENTS...</span></div>
+            <div class="s-line s-pulse"><span class="s-tag">[LISTENING]</span><span class="s-tag"> AWAITING REAL-TIME ARCHITECTURAL EVENTS...</span></div>
           </div>
         </section>
 

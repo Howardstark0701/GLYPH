@@ -299,12 +299,17 @@ const initials = (h: string) =>
       overflow-y:auto; padding:16px 20px;
       display:flex; flex-direction:column; gap:12px;
     }
-    #contrib-list::-webkit-scrollbar { width:3px; }
-    #contrib-list::-webkit-scrollbar-track { background:#131313; }
-    #contrib-list::-webkit-scrollbar-thumb { background:#262626; }
+    #contrib-list::-webkit-scrollbar { width: 4px; }
+    #contrib-list::-webkit-scrollbar-track { background: #0e0e0e; }
+    #contrib-list::-webkit-scrollbar-thumb { background: #cc0000; }
+    #contrib-list::-webkit-scrollbar-thumb:hover { background: #ff0000; }
 
     /* ── Contributor block ───────────────────────────────── */
-    .contrib-block { background:#0e0e0e; border:1px solid #262626; }
+    .contrib-block {
+      background: #0e0e0e; border: 1px solid #262626;
+      cursor: pointer;
+    }
+    .contrib-block:hover { border-color: rgba(204, 0, 0, 0.6); }
 
     /* Header row */
     .cb-header {
@@ -500,12 +505,15 @@ const initials = (h: string) =>
     .feed-ghost-btn:hover { border-color:#cc0000; color:#cc0000; }
 
     #feed-body {
-      flex:1; overflow-y:auto; padding:6px 14px;
-      display:flex; flex-direction:column;
+      flex: 1; overflow-y: auto; padding: 6px 14px;
+      display: flex; flex-direction: column;
+      mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
+      -webkit-mask-image: linear-gradient(to bottom, transparent, black 15%, black 85%, transparent);
     }
-    #feed-body::-webkit-scrollbar { width:3px; }
-    #feed-body::-webkit-scrollbar-track { background:#0e0e0e; }
-    #feed-body::-webkit-scrollbar-thumb { background:#262626; }
+    #feed-body::-webkit-scrollbar { width: 4px; }
+    #feed-body::-webkit-scrollbar-track { background: #0e0e0e; }
+    #feed-body::-webkit-scrollbar-thumb { background: #cc0000; }
+    #feed-body::-webkit-scrollbar-thumb:hover { background: #ff0000; }
 
     .f-line {
       font-family:'JetBrains Mono',monospace; font-size:0.6rem;
@@ -824,13 +832,14 @@ const initials = (h: string) =>
             </div>
           </div>
           <div id="feed-body" role="log" aria-label="Contributor intelligence feed" aria-live="polite">
-            <!-- Seed lines matching screenshot -->
-            <div class="f-line"><span class="f-mute">[MATCH] Heuristic overlap found between </span><span class="f-em">@arch_priya</span><span class="f-mute"> and </span><span class="f-em">@dev_soren</span></div>
-            <div class="f-line"><span class="f-mute">[QUERY] Fetching authorship weight for PR-9821...</span></div>
-            <div class="f-line"><span class="f-mute">[MATCH] Heuristic overlap found between </span><span class="f-em">@arch_priya</span><span class="f-mute"> and </span><span class="f-em">@dev_soren</span></div>
-            <div class="f-line"><span class="f-tag">[PROFILE]</span><span class="f-rust"> @lead_author</span><span class="f-mute"> reasoning extracted...</span></div>
-            <div class="f-line"><span class="f-mute">[DECRYPT] Reasoning hashes validated for </span><span class="f-em">@sec_ananya</span></div>
-            <div class="f-line"><span class="f-rust">[QUERY] Fetching authorship weight for PR-9821...</span></div>
+            <div class="f-line"><span class="f-tag">[PROFILE]</span><span class="f-mute"> @arch_priya reasoning extracted: </span><span class="f-em">'PRIORITIZES_STRUCTURE'</span></div>
+            <div class="f-line"><span class="f-mute">[INFLUENCE] @lead_author scored: </span><span class="f-em">74%</span><span class="f-mute"> aggregate authority</span></div>
+            <div class="f-line"><span class="f-mute">[QUERY] Searching registry for 'performance' pattern matches...</span></div>
+            <div class="f-line"><span class="f-mute">[MATCH] @dev_soren linked to pattern: </span><span class="f-em">PERFORMANCE_CRITICAL</span></div>
+            <div class="f-line"><span class="f-mute">[SYSTEM] Cross-referencing decision history for @infra_tolly...</span></div>
+            <div class="f-line"><span style="color:#cc0000;font-weight:700;">[ALERT]</span><span class="f-mute"> Minimal debate participation detected for </span><span class="f-em">@sec_ananya</span></div>
+            <div class="f-line"><span class="f-tag">[PROFILE]</span><span class="f-mute"> @analytics_reed profile updated: </span><span class="f-em">'MODERATOR_TRAIT_DETECTED'</span></div>
+            <div class="f-line"><span class="f-mute">[NETWORK] Synchronizing intelligence nodes across 12 clusters...</span></div>
           </div>
         </section>
 
@@ -900,6 +909,8 @@ const initials = (h: string) =>
         () => `<span class="f-mute">[MATCH] Heuristic overlap found between </span><span class="f-em">@${handles[0]}</span><span class="f-mute"> and </span><span class="f-em">@${handles[2]}</span>`,
         () => `<span class="f-mute">[QUERY] Fetching authorship weight for PR-${pri}...</span>`,
         () => `<span class="f-mute">[DECRYPT] Reasoning hashes validated for </span><span class="f-em">@${handles[hi % handles.length]}</span>`,
+        () => `<span style="color:#cc0000;font-weight:700;">[ALERT]</span><span class="f-mute"> Minimal debate participation detected for </span><span class="f-em">@${handles[hi % handles.length]}</span>`,
+        () => `<span class="f-mute">[NETWORK] Synchronizing intelligence nodes across ${Math.floor(Math.random()*8+8)} clusters...</span>`,
       ];
 
       let idx = 0;

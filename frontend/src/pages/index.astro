@@ -172,6 +172,22 @@ import '../styles/global.css';
       color: #ffb4a8;
       letter-spacing: -0.02em;
       margin: 0;
+      display: inline-block;
+      animation: high-intensity-glitch 2s infinite steps(1);
+    }
+
+    @keyframes high-intensity-glitch {
+      0%,  100% { transform: translate(0);            clip-path: inset(0 0 0 0);    filter: none; }
+      10%        { clip-path: inset(20% 0 30% 0);     transform: translate(-5px, 2px);  filter: hue-rotate(90deg) contrast(1.5); }
+      11%        { clip-path: inset(0 0 0 0);         transform: translate(0);          filter: none; }
+      30%        { transform: skew(5deg);              opacity: 0.8; }
+      31%        { transform: skew(0);                 opacity: 1; }
+      50%        { clip-path: inset(80% 0 5% 0);      transform: translate(10px, -5px); filter: invert(0.1); }
+      52%        { clip-path: inset(0 0 0 0);         transform: translate(0); }
+      70%        { transform: scaleY(1.1) scaleX(0.9); filter: brightness(1.5); }
+      72%        { transform: scale(1);                filter: none; }
+      90%        { clip-path: inset(40% 0 40% 0);     transform: translate(-15px, 5px); }
+      91%        { clip-path: inset(0 0 0 0);         transform: translate(0); }
     }
 
     .hero-sub {
@@ -250,6 +266,40 @@ import '../styles/global.css';
       max-width: 640px;
       margin-top: 0;
     }
+
+    /* ── Data packet flowing down the trace line ──────────── */
+    @keyframes flow-continuous {
+      0%   { top: 0;    opacity: 0; }
+      10%  { opacity: 1; }
+      90%  { opacity: 1; }
+      100% { top: 100%; opacity: 0; }
+    }
+
+    .data-packet {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%) rotate(45deg);
+      width: 6px;
+      height: 6px;
+      background-color: #ffb4a8;
+      box-shadow: 0 0 8px 2px rgba(255, 180, 168, 0.6);
+      z-index: 20;
+      animation: flow-continuous 4s linear infinite;
+      pointer-events: none;
+    }
+
+    /* ── Node glitch on the trace dots ───────────────────── */
+    @keyframes node-glitch {
+      0%,  100% { transform: translate(0);       opacity: 1; filter: hue-rotate(0deg); }
+      92%        { transform: translate(0);       opacity: 1; }
+      93%        { transform: translate(2px,-1px); opacity: 0.8; filter: hue-rotate(90deg); }
+      94%        { transform: translate(-2px,1px); opacity: 0.9; }
+      95%        { transform: translate(0);       opacity: 1; filter: hue-rotate(0deg); }
+      97%        { transform: scaleX(1.2);         opacity: 0.7; }
+      98%        { transform: scaleX(1);           opacity: 1; }
+    }
+
+    .node-indicator.glitch { animation: node-glitch 4s infinite linear; }
 
     #byok-scroll-container {
       height: 2400px;
@@ -340,7 +390,9 @@ import '../styles/global.css';
       bottom: 44px;
       left: 20px;
       width: 280px;
-      background: #131313;
+      background: rgba(14, 14, 14, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
       border: 1px solid #262626;
       z-index: 50;
     }
@@ -633,11 +685,14 @@ import '../styles/global.css';
               />
             </svg>
 
+            <!-- Data packet riding the path (always animating) -->
+            <div class="data-packet" aria-hidden="true"></div>
+
             <!-- Node cards — positioned along path -->
             <!-- Node 0: Origin / LOCAL_INIT -->
             <div class="node-card" id="node-0" style="top:4px;" role="listitem">
               <div class="node-card-header">
-                <span class="node-indicator solid" aria-hidden="true"></span>
+                <span class="node-indicator solid glitch" aria-hidden="true"></span>
                 <span class="node-label">Origin</span>
               </div>
               <span class="node-sublabel">LOCAL_INIT</span>
@@ -646,7 +701,7 @@ import '../styles/global.css';
             <!-- Node 1: UI Layer / KEYS_HELD -->
             <div class="node-card" id="node-1" style="top:142px;" role="listitem">
               <div class="node-card-header">
-                <span class="node-indicator hollow" aria-hidden="true"></span>
+                <span class="node-indicator hollow glitch" style="animation-delay:0.5s" aria-hidden="true"></span>
                 <span class="node-label">UI Layer</span>
               </div>
               <span class="node-sublabel">KEYS_HELD</span>
@@ -655,7 +710,7 @@ import '../styles/global.css';
             <!-- Node 2: Orchestrator / PENDING_END -->
             <div class="node-card" id="node-2" style="top:282px;" role="listitem">
               <div class="node-card-header">
-                <span class="node-indicator hollow" aria-hidden="true"></span>
+                <span class="node-indicator hollow glitch" style="animation-delay:1s" aria-hidden="true"></span>
                 <span class="node-label">Orchestrator</span>
               </div>
               <span class="node-sublabel">PENDING_END</span>
@@ -664,7 +719,7 @@ import '../styles/global.css';
             <!-- Node 3: Termination / AWAITING_AUTH -->
             <div class="node-card" id="node-3" style="top:422px;" role="listitem">
               <div class="node-card-header">
-                <span class="node-indicator hollow" aria-hidden="true"></span>
+                <span class="node-indicator hollow glitch" style="animation-delay:1.5s" aria-hidden="true"></span>
                 <span class="node-label">Termination</span>
               </div>
               <span class="node-sublabel">AWAITING_AUTH</span>
@@ -673,7 +728,7 @@ import '../styles/global.css';
             <!-- Node 4: Sub-Process / SUB_PROCESS -->
             <div class="node-card" id="node-4" style="top:562px;" role="listitem">
               <div class="node-card-header">
-                <span class="node-indicator hollow" aria-hidden="true"></span>
+                <span class="node-indicator hollow glitch" style="animation-delay:2s" aria-hidden="true"></span>
                 <span class="node-label">Sub-Process</span>
               </div>
               <span class="node-sublabel">SUB_PROCESS</span>
@@ -871,9 +926,20 @@ import '../styles/global.css';
     (function initSyslog() {
       const body = document.getElementById('syslog-body')!;
       const events: string[] = [
-        'REPO_SCAN_INIT', 'UPLINK_OPEN', 'PARSE_MANIFEST',
-        'COMMIT_INDEX_START', 'NIM_HANDSHAKE', 'GRAPH_BUILD',
-        'INTENT_EXTRACT', 'CACHE_WRITE', 'SIGNAL_READY',
+        'SCANNING_PORTS...',
+        'SSL_HANDSHAKE_INITIALIZING',
+        'REDUNDANCY_CHECK_COMPLETE',
+        'PACKET_LOSS: 0.00%',
+        'SIGNAL_STRENGTH_MAX',
+        'SECURITY_BYPASS_ATTEMPT_NULLIFIED',
+        'SYNCING_LOCAL_CLOCK...',
+        'HEARTBEAT_STABLE',
+        'REPO_SCAN_INIT',
+        'NIM_HANDSHAKE',
+        'GRAPH_BUILD',
+        'INTENT_EXTRACT',
+        'CACHE_WRITE',
+        'SIGNAL_READY',
       ];
       let idx = 0;
       const startMs = Date.now();
