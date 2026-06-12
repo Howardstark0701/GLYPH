@@ -1,6 +1,7 @@
 ---
 // GLYPH OS — Terminal Entry Screen
 // index.astro — Single-file landing page
+export const prerender = true;
 import '../styles/global.css';
 ---
 
@@ -31,6 +32,7 @@ import '../styles/global.css';
       font-family: 'Karla', sans-serif;
       min-height: 100vh;
       overflow-x: hidden;
+      overflow-y: auto;
     }
 
     /* ── Typography helpers ───────────────────────────────── */
@@ -149,9 +151,7 @@ import '../styles/global.css';
       margin-bottom: 32px;
       margin-right: 40px;
       min-height: calc(100vh - 72px);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
+      display: block;
     }
 
     /* ── Hero section ─────────────────────────────────────── */
@@ -162,6 +162,7 @@ import '../styles/global.css';
       padding-top: 80px;
       padding-bottom: 48px;
       width: 100%;
+      overflow: visible;
     }
 
     .hero-title {
@@ -173,21 +174,46 @@ import '../styles/global.css';
       letter-spacing: -0.02em;
       margin: 0;
       display: inline-block;
+      position: relative;
       animation: high-intensity-glitch 2s infinite steps(1);
     }
 
+    .hero-title::before,
+    .hero-title::after {
+      content: 'GLYPH';
+      position: absolute;
+      top: 0; left: 0;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 6rem;
+      line-height: 1;
+      letter-spacing: -0.02em;
+      pointer-events: none;
+      animation: high-intensity-glitch 2s infinite steps(1);
+    }
+
+    .hero-title::before {
+      color: #cc0000;
+      z-index: -1;
+    }
+
+    .hero-title::after {
+      color: #ffb4a8;
+      z-index: -2;
+    }
+
     @keyframes high-intensity-glitch {
-      0%,  100% { transform: translate(0);            clip-path: inset(0 0 0 0);    filter: none; }
-      10%        { clip-path: inset(20% 0 30% 0);     transform: translate(-5px, 2px);  filter: hue-rotate(90deg) contrast(1.5); }
-      11%        { clip-path: inset(0 0 0 0);         transform: translate(0);          filter: none; }
-      30%        { transform: skew(5deg);              opacity: 0.8; }
-      31%        { transform: skew(0);                 opacity: 1; }
-      50%        { clip-path: inset(80% 0 5% 0);      transform: translate(10px, -5px); filter: invert(0.1); }
-      52%        { clip-path: inset(0 0 0 0);         transform: translate(0); }
-      70%        { transform: scaleY(1.1) scaleX(0.9); filter: brightness(1.5); }
-      72%        { transform: scale(1);                filter: none; }
-      90%        { clip-path: inset(40% 0 40% 0);     transform: translate(-15px, 5px); }
-      91%        { clip-path: inset(0 0 0 0);         transform: translate(0); }
+      0%, 100% { transform: translate(0); clip-path: inset(0 0 0 0); }
+      10% { clip-path: inset(20% 0 30% 0); transform: translate(-5px, 2px); }
+      11% { clip-path: inset(0 0 0 0); transform: translate(0); }
+      30% { transform: skew(5deg); opacity: 0.8; }
+      31% { transform: skew(0); opacity: 1; }
+      50% { clip-path: inset(80% 0 5% 0); transform: translate(10px, -5px); }
+      52% { clip-path: inset(0 0 0 0); transform: translate(0); }
+      70% { transform: scaleY(1.1) scaleX(0.9); }
+      72% { transform: scale(1); }
+      90% { clip-path: inset(40% 0 40% 0); transform: translate(-15px, 5px); }
+      91% { clip-path: inset(0 0 0 0); transform: translate(0); }
     }
 
     .hero-sub {
@@ -261,18 +287,109 @@ import '../styles/global.css';
 
     /* ── BYOK trace section ───────────────────────────────── */
     #byok-section {
-      position: relative;
       width: 100%;
-      max-width: 640px;
-      margin-top: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 0 60px;
     }
 
-    /* ── Data packet flowing down the trace line ──────────── */
+    .byok-node-wrap {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 48px;
+      width: 192px;
+      margin: 0 auto;
+    }
+
+    /* Full-height vertical line */
+    .byok-line {
+      position: absolute;
+      left: 4.5px;
+      top: 0;
+      bottom: -192px;
+      width: 1px;
+      background: rgba(204, 0, 0, 0.3);
+    }
+
+    /* Active top segment */
+    .byok-line-active {
+      position: absolute;
+      left: 4.5px;
+      top: 0;
+      height: 48px;
+      width: 1px;
+      background: #cc0000;
+    }
+
+    /* Node row */
+    .byok-node {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      position: relative;
+      z-index: 10;
+    }
+
+    .byok-dot-solid {
+      width: 10px;
+      height: 10px;
+      background: #cc0000;
+      border: 1px solid #cc0000;
+      flex-shrink: 0;
+      outline: 2px solid #131313;
+      outline-offset: 2px;
+    }
+
+    .byok-dot-hollow {
+      width: 10px;
+      height: 10px;
+      background: transparent;
+      border: 1px solid #cc0000;
+      flex-shrink: 0;
+    }
+
+    .byok-node-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .byok-node-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.625rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #e5e2e1;
+      font-weight: 700;
+    }
+
+    .byok-node-sub {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.5625rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #5e3f3a;
+    }
+
     @keyframes flow-continuous {
-      0%   { top: 0;    opacity: 0; }
-      10%  { opacity: 1; }
-      90%  { opacity: 1; }
+      0% { top: 0; opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
       100% { top: 100%; opacity: 0; }
+    }
+
+    .data-packet-continuous {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%) rotate(45deg);
+      width: 6px;
+      height: 6px;
+      background-color: #ffb4a8;
+      animation: flow-continuous 4s linear infinite;
+      z-index: 20;
     }
 
     .data-packet {
@@ -308,26 +425,29 @@ import '../styles/global.css';
 
     #byok-sticky {
       position: sticky;
-      top: 40px;
-      height: calc(100vh - 72px);
+      top: 0;
+      height: 100vh;
       display: flex;
       justify-content: center;
-      overflow: hidden;
+      overflow: visible;
     }
 
     #byok-svg-wrap {
       position: relative;
       width: 320px;
       height: 100%;
+      margin: 0 auto;
     }
 
     #byok-svg {
       position: absolute;
       top: 0;
       left: 0;
-      width: 100%;
-      height: 600px;
+      width: 320px;
+      height: 660px;
       overflow: visible;
+      display: block;
+      margin: 0 auto;
     }
 
     /* ── Node cards ───────────────────────────────────────── */
@@ -389,10 +509,8 @@ import '../styles/global.css';
       position: fixed;
       bottom: 44px;
       left: 20px;
-      width: 280px;
-      background: rgba(14, 14, 14, 0.85);
-      backdrop-filter: blur(8px);
-      -webkit-backdrop-filter: blur(8px);
+      width: 240px;
+      background: #0e0e0e;
       border: 1px solid #262626;
       z-index: 50;
     }
@@ -401,45 +519,54 @@ import '../styles/global.css';
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 6px 10px;
+      padding: 5px 8px;
       border-bottom: 1px solid #262626;
     }
 
     .syslog-title {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.6rem;
-      letter-spacing: 0.12em;
+      font-size: 0.5625rem;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: #e5e2e1;
+      color: #e8bdb6;
+      font-weight: 400;
     }
 
     .syslog-status-chip {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.55rem;
-      letter-spacing: 0.1em;
+      font-size: 0.5625rem;
+      letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: #cc0000;
-      border: 1px solid #cc0000;
-      padding: 1px 6px;
+      color: #5e3f3a;
+      font-weight: 400;
       background: transparent;
+      border: none;
+      padding: 0;
     }
 
     #syslog-body {
-      padding: 6px 10px;
+      padding: 4px 8px 6px;
+      overflow: hidden;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.5625rem;
+      color: #ae8882;
+      font-weight: 400;
+      line-height: 1.6;
     }
 
     .log-line {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.6rem;
-      color: #a1a1a1;
-      line-height: 1.5;
+      font-size: 0.5625rem;
+      color: #ae8882;
+      font-weight: 400;
+      line-height: 1.6;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
-    .log-line .ts   { color: #5e3f3a; }
-    .log-line .ev   { color: #e5e2e1; }
+    .log-line .ts { color: #ae8882; }
+    .log-line .ev { color: #ae8882; }
 
     /* ── Clock blink ──────────────────────────────────────── */
     #clock { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; color: #a1a1a1; }
@@ -648,96 +775,69 @@ import '../styles/global.css';
       </button>
     </section>
 
-    <!-- ── BYOK Scroll Trace ─────────────────────────────── -->
+    <!-- ── BYOK Trace ────────────────────────────────────── -->
     <section id="byok-section" aria-label="Credential flow trace">
-      <div id="byok-scroll-container">
-        <div id="byok-sticky">
-          <div id="byok-svg-wrap">
+      <div class="byok-node-wrap" aria-label="Credential flow nodes" role="list">
 
-            <!-- SVG path trace -->
-            <svg id="byok-svg" viewBox="0 0 320 600" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-              <!-- Flat opaque base path (dimmed) -->
-              <path
-                id="byok-path-bg"
-                d="M 160,20 C 160,80 240,100 240,160 C 240,220 80,240 80,300 C 80,360 240,380 240,440 C 240,500 160,520 160,580"
-                fill="none"
-                stroke="#2a0000"
-                stroke-width="1.5"
-                stroke-linecap="square"
-              />
-              <!-- Core line — drawn progressively via dashoffset -->
-              <path
-                id="byok-path-core"
-                class="byok-path-core"
-                d="M 160,20 C 160,80 240,100 240,160 C 240,220 80,240 80,300 C 80,360 240,380 240,440 C 240,500 160,520 160,580"
-                fill="none"
-                stroke="#cc0000"
-                stroke-width="1.5"
-                stroke-linecap="square"
-              />
-              <!-- Moving dot (square) -->
-              <rect
-                id="byok-dot"
-                class="byok-dot"
-                x="156" y="16"
-                width="8" height="8"
-                fill="#cc0000"
-              />
-            </svg>
+        <!-- Vertical line + animated packet -->
+        <div class="byok-line" aria-hidden="true">
+          <div class="data-packet-continuous"></div>
+        </div>
 
-            <!-- Data packet riding the path (always animating) -->
-            <div class="data-packet" aria-hidden="true"></div>
+        <!-- Active top segment -->
+        <div class="byok-line-active" aria-hidden="true"></div>
 
-            <!-- Node cards — positioned along path -->
-            <!-- Node 0: Origin / LOCAL_INIT -->
-            <div class="node-card" id="node-0" style="top:4px;" role="listitem">
-              <div class="node-card-header">
-                <span class="node-indicator solid glitch" aria-hidden="true"></span>
-                <span class="node-label">Origin</span>
-              </div>
-              <span class="node-sublabel">LOCAL_INIT</span>
-            </div>
+        <!-- Node 0: Origin -->
+        <div class="byok-node" style="transform:translateX(0);" role="listitem">
+          <span class="byok-dot-solid" aria-hidden="true"></span>
+          <div class="byok-node-info">
+            <span class="byok-node-label">Origin</span>
+            <span class="byok-node-sub">LOCAL_INIT</span>
+          </div>
+        </div>
 
-            <!-- Node 1: UI Layer / KEYS_HELD -->
-            <div class="node-card" id="node-1" style="top:142px;" role="listitem">
-              <div class="node-card-header">
-                <span class="node-indicator hollow glitch" style="animation-delay:0.5s" aria-hidden="true"></span>
-                <span class="node-label">UI Layer</span>
-              </div>
-              <span class="node-sublabel">KEYS_HELD</span>
-            </div>
+        <!-- Node 1: UI Layer -->
+        <div class="byok-node" style="transform:translateX(16px);" role="listitem">
+          <span class="byok-dot-hollow" aria-hidden="true"></span>
+          <div class="byok-node-info">
+            <span class="byok-node-label">UI Layer</span>
+            <span class="byok-node-sub">READY</span>
+          </div>
+        </div>
 
-            <!-- Node 2: Orchestrator / PENDING_END -->
-            <div class="node-card" id="node-2" style="top:282px;" role="listitem">
-              <div class="node-card-header">
-                <span class="node-indicator hollow glitch" style="animation-delay:1s" aria-hidden="true"></span>
-                <span class="node-label">Orchestrator</span>
-              </div>
-              <span class="node-sublabel">PENDING_END</span>
-            </div>
+        <!-- Node 2: Orchestrator -->
+        <div class="byok-node" style="transform:translateX(-8px);" role="listitem">
+          <span class="byok-dot-hollow" aria-hidden="true"></span>
+          <div class="byok-node-info">
+            <span class="byok-node-label">Orchestrator</span>
+            <span class="byok-node-sub">PENDING_CMD</span>
+          </div>
+        </div>
 
-            <!-- Node 3: Termination / AWAITING_AUTH -->
-            <div class="node-card" id="node-3" style="top:422px;" role="listitem">
-              <div class="node-card-header">
-                <span class="node-indicator hollow glitch" style="animation-delay:1.5s" aria-hidden="true"></span>
-                <span class="node-label">Termination</span>
-              </div>
-              <span class="node-sublabel">AWAITING_AUTH</span>
-            </div>
+        <!-- Node 3: Termination -->
+        <div class="byok-node" style="transform:translateX(24px);" role="listitem">
+          <span class="byok-dot-hollow" aria-hidden="true"></span>
+          <div class="byok-node-info">
+            <span class="byok-node-label">Termination</span>
+            <span class="byok-node-sub">AWAITING_AUTH</span>
+          </div>
+        </div>
 
-            <!-- Node 4: Sub-Process / SUB_PROCESS -->
-            <div class="node-card" id="node-4" style="top:562px;" role="listitem">
-              <div class="node-card-header">
-                <span class="node-indicator hollow glitch" style="animation-delay:2s" aria-hidden="true"></span>
-                <span class="node-label">Sub-Process</span>
-              </div>
-              <span class="node-sublabel">SUB_PROCESS</span>
-              <div class="node-dashed-line" aria-hidden="true"></div>
-            </div>
+        <!-- Node 4: Sub-Process -->
+        <div class="byok-node" style="transform:translateX(8px);opacity:0.5;" role="listitem">
+          <span class="byok-dot-hollow" aria-hidden="true"></span>
+          <div class="byok-node-info">
+            <span class="byok-node-label">Sub-Process</span>
+            <span class="byok-node-sub">INITIALIZING...</span>
+          </div>
+        </div>
 
-          </div><!-- /byok-svg-wrap -->
-        </div><!-- /byok-sticky -->
-      </div><!-- /byok-scroll-container -->
+        <!-- Dashed tail line -->
+        <svg viewBox="0 0 2 100" width="2" height="100" style="opacity:0.4;margin-left:4px;" aria-hidden="true">
+          <path d="M1 0V100" stroke="#cc0000" stroke-dasharray="4 4" stroke-width="1"/>
+        </svg>
+
+      </div>
     </section>
 
   </main>
@@ -805,11 +905,11 @@ import '../styles/global.css';
       <span class="syslog-status-chip" role="status">ACTIVE</span>
     </div>
     <div id="syslog-body" role="log" aria-label="System log entries">
-      <div class="log-line"><span class="ts">[00:00:00.01]</span> <span class="ev">KERNEL_BOOT</span> <span class="text-muted">init stage 1</span></div>
-      <div class="log-line"><span class="ts">[00:00:00.04]</span> <span class="ev">NET_INTERFACE</span> <span class="text-muted">uplink ready</span></div>
-      <div class="log-line"><span class="ts">[00:00:00.09]</span> <span class="ev">DB_POOL_INIT</span> <span class="text-muted">connections: 8</span></div>
-      <div class="log-line"><span class="ts">[00:00:00.12]</span> <span class="ev">AUTH_MODULE</span> <span class="text-muted">keys: none held</span></div>
-      <div class="log-line"><span class="ts">[00:00:00.18]</span> <span class="ev">SYSTEM_STABLE</span> <span class="text-muted">latency nominal</span></div>
+      <div class="log-line">[00:50:33] SYNCING_LOCAL_CLOCK...</div>
+      <div class="log-line">[00:50:36] REDUNDANCY_CHECK_COMPLETE</div>
+      <div class="log-line">[00:50:39] HEARTBEAT_STABLE</div>
+      <div class="log-line">[00:50:42] SSL_HANDSHAKE_INITIALIZING</div>
+      <div class="log-line">[00:50:45] SYNCING_LOCAL_CLOCK...</div>
     </div>
   </aside>
 
@@ -949,60 +1049,18 @@ import '../styles/global.css';
         const s  = Math.floor(elapsed / 1000);
         const ms = Math.floor((elapsed % 1000) / 10);
         const pad = (n: number, d: number) => String(n).padStart(d, '0');
-        const ts  = `[${pad(0,2)}:${pad(0,2)}:${pad(s,2)}.${pad(ms,2)}]`;
+        const ts  = `[${pad(Math.floor(s/3600),2)}:${pad(Math.floor((s%3600)/60),2)}:${pad(s%60,2)}]`;
         const ev  = events[idx % events.length];
         idx++;
 
         const line = document.createElement('div');
-        line.className = 'log-line';
-        line.innerHTML = `<span class="ts">${ts}</span> <span class="ev">${ev}</span>`;
+        line.textContent = `${ts} ${ev}`;
         body.appendChild(line);
-        while (body.children.length > 7) body.removeChild(body.firstChild!);
+        while (body.children.length > 5) body.removeChild(body.firstChild!);
       }, 2400);
     })();
 
-    // ── BYOK scroll trace ─────────────────────────────────
-    (function initByokTrace() {
-      const pathEl    = document.getElementById('byok-path-core') as SVGPathElement | null;
-      const dotEl     = document.getElementById('byok-dot') as SVGRectElement | null;
-      const container = document.getElementById('byok-scroll-container') as HTMLElement | null;
-      const sticky    = document.getElementById('byok-sticky') as HTMLElement | null;
-
-      if (!pathEl || !dotEl || !container || !sticky) return;
-
-      const totalLen = pathEl.getTotalLength();
-      pathEl.style.strokeDasharray  = String(totalLen);
-      pathEl.style.strokeDashoffset = String(totalLen);
-
-      const nodes: { id: string; threshold: number }[] = [
-        { id: 'node-0', threshold: 0.00 },
-        { id: 'node-1', threshold: 0.22 },
-        { id: 'node-2', threshold: 0.44 },
-        { id: 'node-3', threshold: 0.66 },
-        { id: 'node-4', threshold: 0.88 },
-      ];
-
-      function onScroll() {
-        const containerTop = container!.getBoundingClientRect().top;
-        const scrollHeight = container!.offsetHeight - sticky!.offsetHeight;
-        const progress     = Math.max(0, Math.min(1, -containerTop / scrollHeight));
-
-        pathEl!.style.strokeDashoffset = String(totalLen * (1 - progress));
-
-        const pt = pathEl!.getPointAtLength(totalLen * progress);
-        dotEl!.setAttribute('x', String(pt.x - 4));
-        dotEl!.setAttribute('y', String(pt.y - 4));
-
-        for (const node of nodes) {
-          const el = document.getElementById(node.id);
-          if (!el) continue;
-          el.classList.toggle('visible', progress >= node.threshold);
-        }
-      }
-
-      window.addEventListener('scroll', onScroll, { passive: true });
-      onScroll();
-    })();
+    // ── BYOK scroll trace removed — replaced with CSS-only implementation ──
 
     // ── Repo input submit — calls POST /api/analyze ───────
     (function initInput() {

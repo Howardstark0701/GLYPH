@@ -74,10 +74,10 @@
 - [x] `Cargo.toml` cleaned of dead shuttle-* dependencies
 - [x] CORS reads `FRONTEND_URL` from env var
 - [x] `.gitignore` covers `.env`, `dist/`, `target/`
-- [ ] Render account created + service deployed
-- [ ] Vercel project created + `PUBLIC_API_BASE_URL` env var set
-- [ ] Frontend deployed via `vercel --prod`
-- [ ] `FRONTEND_URL` updated in Render env vars after Vercel deploy
+- [x] Render account created + service deployed → `https://glyph-api-u495.onrender.com`
+- [x] Vercel project created + `PUBLIC_API_BASE_URL` env var set
+- [x] Frontend deployed → `https://glyph-pua2jbu7s-glyph-tango.vercel.app`
+- [x] `FRONTEND_URL` updated in Render env vars after Vercel deploy
 
 ## Current Implementation Details
 

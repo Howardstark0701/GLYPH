@@ -7,17 +7,34 @@
 *, *::before, *::after {
   border-radius: 0 !important;
   box-shadow: none !important;
-  transition: none !important;
-  animation-duration: 0s !important;
   text-shadow: none !important;
-  filter: none !important;
 }
 
-/* Allow scroll animation overrides */
+/* Allow animations on specific elements */
+.hero-title,
+.hero-title::before,
+.hero-title::after,
+.data-packet-continuous,
 .byok-dot,
-.byok-path-core {
+.byok-path-core,
+.data-packet,
+.node-indicator,
+#scanline-bar,
+.status-dot,
+.s-pulse,
+.log-line,
+.stream-live-sq {
   animation-duration: unset !important;
   transition: none !important;
+  filter: unset !important;
+}
+
+.hero-title {
+  animation-duration: 2s !important;
+}
+
+.data-packet-continuous {
+  animation-duration: 4s !important;
 }
 
 html, body {
