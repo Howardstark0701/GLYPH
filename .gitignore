@@ -9,6 +9,9 @@ frontend/dist/
 frontend/node_modules/
 backend/target/
 
+# Local-only showcase
+SHOWCASE.md
+
 # OS
 .DS_Store
 Thumbs.db
