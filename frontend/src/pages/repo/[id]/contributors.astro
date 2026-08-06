@@ -761,7 +761,7 @@ const initials = (h: string) =>
         <aside id="right-panel" aria-label="Registry intelligence">
 
           <!-- Registry stats -->
-          <div class="rp-section">
+          <div class="rp-section" id="registry-stats">
             <div class="rp-label">
               <span class="rp-label-dot" aria-hidden="true"></span>
               REGISTRY_STATS
@@ -785,7 +785,7 @@ const initials = (h: string) =>
           </div>
 
           <!-- Influence histogram -->
-          <div class="rp-section">
+          <div class="rp-section" id="influence-hist">
             <div class="rp-label">
               <span class="rp-label-dot" aria-hidden="true"></span>
               INFLUENCE_HIST
@@ -802,7 +802,7 @@ const initials = (h: string) =>
           </div>
 
           <!-- Pattern breakdown -->
-          <div class="rp-section">
+          <div class="rp-section" id="pattern-breakdown">
             <div class="rp-label">
               <span class="rp-label-dot" aria-hidden="true"></span>
               PATTERN_BREAKDOWN
@@ -857,22 +857,155 @@ const initials = (h: string) =>
     import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed } from '../../../scripts/repo-view';
     const API_BASE = apiBase();
 
-    // ── Hydrate from real API ─────────────────────────────
+    // ── Hydrate real contributor profiles from the API ────
     (function hydrateContributors() {
       const jobId = getJobId();
       if (!jobId) return;
 
+      const initials = (h: string) =>
+        h.split(/[_\-]/).slice(0, 2).map(p => (p[0] ?? '').toUpperCase()).join('') || '??';
+
       fetch(`${API_BASE}/api/repo/${jobId}/contributors`)
         .then(r => r.ok ? r.json() : null)
         .then(data => {
-          if (!data?.contributors?.length) {
+          const raw = data?.contributors;
+          if (!Array.isArray(raw) || !raw.length) {
             const feed = document.getElementById('feed-body');
             showEmptyState(feed, 'NO_CONTRIBUTORS_SIGNALED',
               'This analysis isolated no authorship patterns for this repository.');
             return;
           }
-          // Update influence histogram bars with real data
-          // (full re-render reserved for v2 — API shapes match seed)
+
+          const maxNodes = Math.max(...raw.map((c: any) => c.total_nodes ?? 0), 1);
+          const nodes = raw.map((c: any, idx: number) => {
+            const decisions  = c.decisions ?? 0;
+            const debates    = c.debates ?? 0;
+            const rejections = c.rejections ?? 0;
+            const total      = c.total_nodes ?? (decisions + debates + rejections);
+            const influence  = Math.max(1, Math.round((total / maxNodes) * 100));
+            const rejectionRate = total > 0 ? rejections / total : 0;
+            const confidence = Math.round(c.avg_confidence ?? 0);
+
+            const role = rejectionRate > 0.4
+              ? 'REVIEWER / GATEKEEPER'
+              : debates > decisions
+                ? 'DEBATE LEADER'
+                : 'DECISION AUTHOR';
+
+            const pattern = rejectionRate > 0.4
+              ? 'REJECTION_HARDENED'
+              : debates > decisions && debates > rejections
+                ? 'DEBATE_DRIVEN'
+                : decisions > 0
+                  ? 'DECISION_AUTHORITY'
+                  : 'OBSERVER';
+
+            const reasoning = rejectionRate > 0.4
+              ? `Rejection-heavy profile — blocks proposals that lack evidence. ${rejections} proposals vetoed across ${debates} debate threads.`
+              : debates > decisions
+                ? `Consensus-builder — active in ${debates} debate threads, authors ${decisions} decisions. Pressures proposals through review.`
+                : `Primary decision author — owns ${decisions} decisions directly. ${rejections} proposals rejected. Signals at ${confidence}% mean confidence.`;
+
+            return {
+              handle: c.handle, decisions, debates, rejections, influence, confidence, role, pattern, reasoning,
+              nodeId: `CTB-${String(idx + 1).padStart(3, '0')}-${(c.handle.slice(0, 2) || 'XX').toUpperCase()}`,
+            };
+          });
+
+          // Rebuild the card grid
+          const list = document.getElementById('contrib-list');
+          if (list) {
+            list.innerHTML = '';
+            nodes.forEach(c => {
+              const block = document.createElement('div');
+              block.className = 'contrib-block';
+              block.setAttribute('role', 'listitem');
+              block.setAttribute('aria-label', `Contributor: ${c.handle}`);
+              block.innerHTML = `
+                <div class="cb-header">
+                  <div class="cb-avatar" aria-hidden="true"><span class="cb-avatar-text">${initials(c.handle)}</span></div>
+                  <div class="cb-identity">
+                    <span class="cb-handle"><span class="cb-handle-prefix">@</span>${c.handle}</span>
+                    <div class="cb-role-row">
+                      <span class="cb-role-chip">${c.role}</span>
+                      <span class="cb-influence-tag">INFLUENCE_WEIGHT:</span>
+                      <span class="cb-influence-val">${c.influence}%</span>
+                    </div>
+                  </div>
+                  <div style="margin-left:auto;color:#3a3a3a;" aria-hidden="true">
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                      <rect x="3" y="3" width="8" height="8" stroke="currentColor" stroke-width="1"/>
+                      <rect x="1" y="1" width="8" height="8" stroke="currentColor" stroke-width="1" fill="#131313"/>
+                    </svg>
+                  </div>
+                </div>
+                <div class="cb-stats" aria-label="Stats: ${c.decisions} decisions, ${c.debates} debates, ${c.rejections} rejections">
+                  <div class="cb-stat-cell"><span class="cb-stat-val">${c.decisions.toLocaleString()}</span><span class="cb-stat-label">DECISIONS</span></div>
+                  <div class="cb-stat-cell"><span class="cb-stat-val">${c.debates.toLocaleString()}</span><span class="cb-stat-label">DEBATES</span></div>
+                  <div class="cb-stat-cell"><span class="cb-stat-val">${c.rejections}</span><span class="cb-stat-label">REJECTIONS</span></div>
+                </div>
+                <div class="cb-reasoning">
+                  <span class="cb-reasoning-label">REASONING_PROFILE:</span>
+                  <p class="cb-reasoning-text">${c.reasoning}</p>
+                </div>
+                <div class="cb-footer">
+                  <div style="display:flex;align-items:center;gap:6px;">
+                    <span class="cb-pattern-label">DOMINANT_PATTERN:</span>
+                    <span class="cb-pattern-val">${c.pattern}</span>
+                  </div>
+                  <span class="cb-id-tag">ID: ${c.nodeId}</span>
+                </div>`;
+              list.appendChild(block);
+            });
+          }
+
+          // Registry stats
+          const totalDecisions = nodes.reduce((a, c) => a + c.decisions, 0);
+          const avgInfluence   = Math.round(nodes.reduce((a, c) => a + c.influence, 0) / nodes.length);
+          const participation  = Math.min(100, Math.round(avgInfluence));
+          const statVals = document.querySelectorAll('#registry-stats .rp-stat-row .rp-stat-val');
+          if (statVals[0]) statVals[0].textContent = String(nodes.length);
+          if (statVals[1]) statVals[1].textContent = totalDecisions.toLocaleString();
+          if (statVals[2]) statVals[2].textContent = `${participation}%`;
+          if (statVals[3]) statVals[3].textContent = `${avgInfluence}%`;
+
+          // Influence histogram
+          const hist = document.getElementById('influence-hist');
+          if (hist) {
+            hist.querySelectorAll('.inf-bar-row').forEach(el => el.remove());
+            nodes.forEach(c => {
+              const row = document.createElement('div');
+              row.className = 'inf-bar-row';
+              row.setAttribute('aria-label', `${c.handle}: ${c.influence}%`);
+              row.innerHTML = `
+                <span class="inf-bar-handle">${c.handle.replace('_', ' ').toUpperCase().slice(0, 10)}</span>
+                <div class="inf-bar-track" aria-hidden="true">
+                  <div class="inf-bar-fill" style="width:${Math.round(c.influence / Math.max(...nodes.map(n => n.influence)) * 100)}%"></div>
+                </div>
+                <span class="inf-bar-pct">${c.influence}%</span>`;
+              hist.appendChild(row);
+            });
+          }
+
+          // Pattern breakdown
+          const patterns = document.getElementById('pattern-breakdown');
+          if (patterns) {
+            patterns.querySelectorAll('.pattern-row').forEach(el => el.remove());
+            nodes.forEach(c => {
+              const row = document.createElement('div');
+              row.className = 'pattern-row';
+              row.setAttribute('aria-label', `${c.pattern}: ${c.handle}`);
+              row.innerHTML = `
+                <span class="pattern-dot" aria-hidden="true"></span>
+                <span class="pattern-name">${c.pattern.replace(/_/g, ' ').toLowerCase()}</span>
+                <span class="pattern-owner">@${c.handle.split('_')[0]}</span>`;
+              patterns.appendChild(row);
+            });
+          }
+
+          // Profile counter in feed header
+          const counter = document.querySelector('.feed-header-right');
+          if (counter) counter.textContent = `PROFILES: ${nodes.length}`;
         })
         .catch(() => {
           const body = document.getElementById('feed-body');

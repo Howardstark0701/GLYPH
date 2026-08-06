@@ -25,6 +25,11 @@ DATABASE_URL=postgres://localhost/glyph cargo run
 The server listens on `0.0.0.0:8000` (override with `PORT`). Migrations run
 automatically on first boot.
 
+Migration `002_rich_ingestion.sql` adds the PR review / PR comment / issue
+comment tables plus unique constraints on existing tables so re-analysis is
+idempotent. Note the review-thread tables store the GitHub author in a quoted
+`"user"` column (`user` is a reserved word in PostgreSQL).
+
 ## Environment variables
 
 | Variable | Required | Default | Purpose |

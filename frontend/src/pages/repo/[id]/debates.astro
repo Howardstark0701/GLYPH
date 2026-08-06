@@ -774,7 +774,7 @@ const statusColor = debateThread.status === 'HEATED'
       });
     })();
 
-    // ── Hydrate metrics from real API ─────────────────────
+    // ── Hydrate thread header + metrics from real API ─────
     (function hydrateDebates() {
       const jobId = getJobId();
       if (!jobId) return;
@@ -783,15 +783,35 @@ const statusColor = debateThread.status === 'HEATED'
         .then(r => r.ok ? r.json() : null)
         .then(data => {
           const m = data?.metrics;
+          const first = Array.isArray(data?.debates) ? data.debates[0] : null;
+
           if (!m || (!m.agreement_pct && !m.contention_pct)) {
             const feed = document.getElementById('feed-body');
             showEmptyState(feed, 'NO_DEBATE_METRICS',
               'This analysis surfaced no measurable debate threads for this repository.');
             return;
           }
+
+          // Update sentiment metrics that the API actually reports.
+          // REDUNDANCY / UNRESOLVED have no backend source — left as page chrome.
           const cols = document.querySelectorAll('.sm-value');
-          if (cols[0]) cols[0].textContent = `${m.agreement_pct ?? 18}%`;
-          if (cols[1]) cols[1].textContent = `${m.contention_pct ?? 54}%`;
+          if (cols[0]) cols[0].textContent = `${m.agreement_pct ?? 0}%`;
+          if (cols[1]) cols[1].textContent = `${m.contention_pct ?? 0}%`;
+
+          // Update thread identity from the lead debate
+          const threadId = document.querySelector('.thread-id');
+          if (threadId) {
+            const pr    = first?.source_refs?.[0]?.ref ?? 'N/A';
+            const topic = (first?.title ?? 'UNKNOWN_DEBATE').toUpperCase().replace(/\s+/g, '_');
+            const contention = m.contention_pct ?? 0;
+            const status = contention >= 50 ? 'HEATED' : contention >= 20 ? 'ACTIVE' : 'RESOLVED';
+            const statusColor = status === 'HEATED' ? '#cc0000' : status === 'ACTIVE' ? '#5e3f3a' : '#a1a1a1';
+            threadId.innerHTML =
+              `THREAD_ID: PR_${pr}_${topic}` +
+              `<span style="margin: 0 8px; color: #262626;">//</span>` +
+              `STATUS: <span class="thread-status" style="color: ${statusColor}">${status}</span>`;
+          }
+
         })
         .catch(() => {
           const body = document.getElementById('feed-body');

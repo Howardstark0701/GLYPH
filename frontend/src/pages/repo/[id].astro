@@ -805,6 +805,15 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
             </svg>
             TERMINATE
           </button>
+          <button id="export-btn" class="util-btn" aria-label="Export full analysis report (JSON + Markdown)">
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
+              <line x1="4" y1="0" x2="4" y2="5" stroke="currentColor" stroke-width="1"/>
+              <line x1="1.5" y1="3" x2="4" y2="5.5" stroke="currentColor" stroke-width="1"/>
+              <line x1="6.5" y1="3" x2="4" y2="5.5" stroke="currentColor" stroke-width="1"/>
+              <line x1="0" y1="7" x2="8" y2="7" stroke="currentColor" stroke-width="1"/>
+            </svg>
+            EXPORT
+          </button>
         </div>
       </div>
     </aside>
@@ -1125,6 +1134,156 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
         }
         btn.disabled = false;
         setTimeout(function () { btn.textContent = 'TERMINATE'; }, 4000);
+      });
+    })();
+
+    // ── EXPORT btn ────────────────────────────────────────
+    // Bundles every analysis endpoint into a single JSON report + a
+    // human-readable Markdown brief, downloaded client-side. No keys leave
+    // the browser beyond the normal per-request BYOK headers.
+    (function initExport() {
+      var btn = document.getElementById('export-btn');
+      var API_BASE = (import.meta.env && import.meta.env.PUBLIC_API_BASE_URL) || 'http://localhost:8000';
+      var pathParts = window.location.pathname.split('/').filter(Boolean);
+      var repoId = pathParts[pathParts.length - 1];
+      var IS_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+      btn.addEventListener('click', async function () {
+        // Demo/slug URLs are not backed by a real analysis — refuse honestly.
+        if (!IS_UUID.test(repoId)) {
+          btn.textContent = 'NO_DATA';
+          setTimeout(function () { btn.textContent = 'EXPORT'; }, 3000);
+          return;
+        }
+
+        btn.textContent = 'EXPORTING...';
+        btn.disabled = true;
+
+        function getJson(path) {
+          return fetch(API_BASE + path).then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          });
+        }
+
+        try {
+          var [status, decisions, debates, rejections, contributors, graph] = await Promise.all([
+            getJson('/api/repo/' + repoId + '/status'),
+            getJson('/api/repo/' + repoId + '/decisions'),
+            getJson('/api/repo/' + repoId + '/debates'),
+            getJson('/api/repo/' + repoId + '/rejections'),
+            getJson('/api/repo/' + repoId + '/contributors'),
+            getJson('/api/repo/' + repoId + '/graph'),
+          ]);
+
+          // Summary is NIM-generated and needs the BYOK key; include it when available.
+          var summary = null;
+          try {
+            var nimKey = sessionStorage.getItem('glyph_nim_key') || '';
+            var sResp  = await fetch(API_BASE + '/api/repo/' + repoId + '/summary', {
+              headers: nimKey ? { 'X-Nim-Api-Key': nimKey } : {},
+            });
+            if (sResp.ok) summary = await sResp.json();
+          } catch (_) { /* optional — omit from report */ }
+
+          var report = {
+            glyph_version: '1.0.0',
+            exported_at: new Date().toISOString(),
+            repo: { id: repoId },
+            status: status,
+            summary: summary,
+            decisions: decisions.decisions || [],
+            debates: debates.debates || [],
+            debates_metrics: debates.metrics || null,
+            rejections: rejections.rejections || [],
+            contributors: contributors.contributors || [],
+            graph: graph,
+          };
+
+          // ── Download JSON ────────────────────────────────
+          var jsonBlob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(jsonBlob);
+          a.download = 'glyph-report-' + repoId + '.json';
+          a.click();
+          URL.revokeObjectURL(a.href);
+
+          // ── Build Markdown brief ─────────────────────────
+          var md = [];
+          md.push('# GLYPH Analysis Report');
+          md.push('');
+          md.push('- **Repository ID:** `' + repoId + '`');
+          md.push('- **Status:** ' + (status.status || 'unknown').toUpperCase());
+          if (status.stage) md.push('- **Stage:** ' + status.stage);
+          if (status.analyzed_at) md.push('- **Analyzed:** ' + String(status.analyzed_at).replace('T', ' ').replace('Z', ''));
+          if (status.error_message) md.push('- **Error:** ' + status.error_message);
+          md.push('');
+          if (summary && summary.narrative) {
+            md.push('## Narrative Summary');
+            md.push('');
+            md.push(summary.narrative);
+            md.push('');
+          }
+          if ((decisions.decisions || []).length) {
+            md.push('## Decisions (' + decisions.decisions.length + ')');
+            md.push('');
+            decisions.decisions.forEach(function (d) {
+              md.push('- **' + (d.title || 'UNTITLED') + '** — ' + (d.summary || '') +
+                ' (confidence ' + Math.round((d.confidence || 0) * 100) + '%)');
+            });
+            md.push('');
+          }
+          if ((debates.debates || []).length) {
+            md.push('## Debates (' + debates.debates.length + ')');
+            md.push('');
+            debates.debates.forEach(function (d) {
+              md.push('- **' + (d.title || 'UNTITLED') + '** — ' + (d.summary || '') +
+                ' (contributors: ' + (Array.isArray(d.contributors) ? d.contributors.join(', ') : 'n/a') + ')');
+            });
+            md.push('');
+          }
+          if ((rejections.rejections || []).length) {
+            md.push('## Rejections (' + rejections.rejections.length + ')');
+            md.push('');
+            rejections.rejections.forEach(function (r) {
+              md.push('- **' + (r.title || 'UNTITLED') + '** — ' + (r.reasoning || r.summary || ''));
+            });
+            md.push('');
+          }
+          if ((contributors.contributors || []).length) {
+            md.push('## Contributors (' + contributors.contributors.length + ')');
+            md.push('');
+            contributors.contributors.forEach(function (c) {
+              md.push('- @' + c.handle + ' — ' + c.decisions + ' decisions, ' + c.debates +
+                ' debates, ' + c.rejections + ' rejections (avg confidence ' + (c.avg_confidence || 0) + '%)');
+            });
+            md.push('');
+          }
+          if (graph && graph.meta) {
+            md.push('## Graph');
+            md.push('');
+            md.push('- Nodes: ' + graph.meta.total_nodes + ' · Links: ' + graph.meta.total_links + ' · Density: ' + graph.meta.density_pct + '%');
+          }
+
+          var mdBlob = new Blob([md.join('\n')], { type: 'text/markdown' });
+          var m = document.createElement('a');
+          m.href = URL.createObjectURL(mdBlob);
+          m.download = 'glyph-report-' + repoId + '.md';
+          m.click();
+          URL.revokeObjectURL(m.href);
+
+          btn.textContent = 'EXPORTED ✓';
+          if (window.__glyphAppendStream) {
+            window.__glyphAppendStream('info', 'Report exported — JSON + Markdown');
+          }
+        } catch (err) {
+          btn.textContent = 'EXPORT_FAIL';
+          if (window.__glyphAppendStream) {
+            window.__glyphAppendStream('critical', 'REPORT EXPORT FAILED — ' + String(err.message || err));
+          }
+        }
+        btn.disabled = false;
+        setTimeout(function () { btn.textContent = 'EXPORT'; }, 5000);
       });
     })();
 
