@@ -1,4 +1,5 @@
 use crate::errors::AppError;
+use crate::ingestion::gh_get;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize)]
@@ -17,15 +18,12 @@ pub struct CommitDetail {
 
 #[derive(Debug, Deserialize)]
 pub struct CommitAuthor {
-    pub name: String,
-    pub email: String,
     pub date: String,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct AuthorInfo {
     pub login: Option<String>,
-    pub id: Option<u64>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -56,20 +54,7 @@ pub async fn fetch_all_commits(
             owner, repo, PER_PAGE, page
         );
 
-        let resp = client
-            .get(&url)
-            .header("Authorization", format!("Bearer {}", token))
-            .header("User-Agent", "glyph/0.1")
-            .send()
-            .await?;
-
-        if !resp.status().is_success() {
-            return Err(AppError::GitHubApiError(format!(
-                "GitHub commits API returned {} on page {}",
-                resp.status(), page
-            )));
-        }
-
+        let resp   = gh_get(client, token, &url).await?;
         let batch: Vec<GitHubCommit> = resp.json().await?;
         let done = batch.len() < PER_PAGE as usize;
         all.extend(batch);
@@ -79,14 +64,4 @@ pub async fn fetch_all_commits(
     }
 
     Ok(all)
-}
-
-/// Single-page fetch kept for backward compat
-pub async fn fetch_commits(
-    client: &reqwest::Client,
-    token:  &str,
-    owner:  &str,
-    repo:   &str,
-) -> Result<Vec<GitHubCommit>, AppError> {
-    fetch_all_commits(client, token, owner, repo).await
 }

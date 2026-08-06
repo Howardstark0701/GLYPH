@@ -11,13 +11,6 @@ use crate::AppState;
 // ── Row structs ───────────────────────────────────────────
 
 #[derive(Debug, Serialize)]
-pub struct RepoStatus {
-    pub id:          String,
-    pub status:      Option<String>,
-    pub analyzed_at: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
 struct IntentRow {
     id:           String,
     node_type:    Option<String>,
@@ -35,20 +28,24 @@ struct IntentRow {
 pub async fn get_status(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
-) -> Result<Json<RepoStatus>, AppError> {
-    let row = sqlx::query(
-        "SELECT id::text, status, analyzed_at::text FROM repos WHERE id = $1"
+) -> Result<Json<Value>, AppError> {
+    match sqlx::query(
+        "SELECT id::text, status, stage, error_message, analyzed_at::text
+         FROM repos WHERE id = $1"
     )
     .bind(id)
     .fetch_optional(&state.db)
-    .await?
-    .ok_or_else(|| AppError::NotFound(format!("Repository {} not found", id)))?;
-
-    Ok(Json(RepoStatus {
-        id:          row.try_get("id").unwrap_or_default(),
-        status:      row.try_get("status").ok(),
-        analyzed_at: row.try_get("analyzed_at").ok(),
-    }))
+    .await {
+        Ok(Some(row)) => Ok(Json(json!({
+            "id": row.try_get::<String,_>("id").unwrap_or_default(),
+            "status": row.try_get::<String,_>("status").ok(),
+            "stage": row.try_get::<String,_>("stage").ok(),
+            "error_message": row.try_get::<String,_>("error_message").ok(),
+            "analyzed_at": row.try_get::<String,_>("analyzed_at").ok(),
+        }))),
+        Ok(None) => Err(AppError::NotFound("repo not found".into())),
+        Err(e) => Err(AppError::DatabaseError(e.to_string())),
+    }
 }
 
 // ── GET /repo/:id/intent ──────────────────────────────────
@@ -221,15 +218,25 @@ pub async fn get_summary(
         return Err(AppError::NotFound("No intent nodes found — run analysis first".into()));
     }
 
-    let repo_row = sqlx::query("SELECT owner, name FROM repos WHERE id = $1")
+    // Get repo owner/name with proper error handling
+    let (owner, name) = match sqlx::query("SELECT owner, name FROM repos WHERE id = $1")
         .bind(id)
-        .fetch_one(&state.db)
-        .await?;
-    let owner: Option<String> = repo_row.try_get("owner").ok();
-    let name:  Option<String> = repo_row.try_get("name").ok();
+        .fetch_optional(&state.db)
+        .await {
+        Ok(Some(row)) => {
+            let owner: Option<String> = row.try_get("owner").ok();
+            let name: Option<String> = row.try_get("name").ok();
+            (owner.unwrap_or_else(|| "unknown".into()), name.unwrap_or_else(|| "unknown".into()))
+        },
+        Ok(None) => ("unknown".into(), "unknown".into()),
+        Err(e) => {
+            tracing::error!("get_summary: failed to fetch repo: {:?}", e);
+            return Err(AppError::DatabaseError(e.to_string()));
+        }
+    };
 
     let context = json!({
-        "repository": format!("{}/{}", owner.as_deref().unwrap_or("unknown"), name.as_deref().unwrap_or("unknown")),
+        "repository": format!("{}/{}", owner, name),
         "intent_nodes": rows.iter().map(|r| json!({ "type": r.node_type, "title": r.title, "summary": r.summary })).collect::<Vec<_>>()
     });
 
@@ -241,53 +248,88 @@ pub async fn get_summary(
         context
     );
 
-    let base_url = std::env::var("NIM_BASE_URL")
-        .unwrap_or_else(|_| "https://integrate.api.nvidia.com/v1".to_string());
-
-    let request = crate::intelligence::client::NimRequest {
-        model: "nvidia/llama-3.1-nemotron-70b-instruct".into(),
-        messages: vec![
-            crate::intelligence::client::Message {
-                role: "system".into(),
-                content: "You are a codebase intelligence analyst writing structured repository intelligence reports.".into(),
-            },
-            crate::intelligence::client::Message { role: "user".into(), content: prompt },
-        ],
-        temperature: 0.3,
-        max_tokens: 2048,
-    };
-
-    let resp = state.http_client
-        .post(format!("{}/chat/completions", base_url))
-        .header("Authorization", format!("Bearer {}", nim_api_key))
-        .header("Content-Type", "application/json")
-        .json(&request)
-        .send().await?;
-
-    if !resp.status().is_success() {
-        let status = resp.status();
-        let body   = resp.text().await.unwrap_or_default();
-        return Err(AppError::NimApiError(format!("NIM returned {}: {}", status, body)));
-    }
-
-    let nim_resp: crate::intelligence::client::NimResponse = resp.json().await?;
-    let narrative = nim_resp.choices.first().map(|c| c.message.content.clone()).unwrap_or_default();
+    let system = "You are a codebase intelligence analyst writing structured repository intelligence reports.";
+    let narrative = crate::intelligence::client::chat(
+        &state.http_client,
+        nim_api_key,
+        &crate::intelligence::client::model_from_env(),
+        system,
+        &prompt,
+        0.3,
+        2048,
+    )
+    .await?;
 
     Ok(Json(json!({ "repo_id": id.to_string(), "narrative": narrative, "node_count": rows.len() })))
+}
+
+// ── POST /repo/:id/override ───────────────────────────────
+
+pub async fn override_repo(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Value>, AppError> {
+    match sqlx::query("UPDATE repos SET status = 'override' WHERE id = $1")
+        .bind(id)
+        .execute(&state.db)
+        .await {
+        Ok(_) => {
+            let ts = chrono::Utc::now().to_rfc3339();
+            Ok(Json(json!({
+                "repo_id": id.to_string(),
+                "status": "override",
+                "message": "Manual override initialized. Repository analysis queued for reprocessing.",
+                "timestamp": ts
+            })))
+        },
+        Err(e) => Err(AppError::DatabaseError(e.to_string())),
+    }
+}
+
+// ── POST /repo/:id/terminate ──────────────────────────────
+
+/// Request cancellation of an in-flight analysis. Flips the in-memory cancel
+/// flag (checked between phases); run_analysis records status "terminated".
+/// Idempotent — a repo with no running job is just marked terminated.
+pub async fn terminate_repo(
+    State(state): State<Arc<AppState>>,
+    Path(id): Path<Uuid>,
+) -> Result<Json<Value>, AppError> {
+    {
+        let mut guards = state.cancellations.lock().unwrap();
+        if let Some(flag) = guards.remove(&id) {
+            flag.store(true, std::sync::atomic::Ordering::Relaxed);
+        }
+    } // guard dropped — never held across await
+
+    let updated = sqlx::query("UPDATE repos SET status = 'terminated' WHERE id = $1")
+        .bind(id)
+        .execute(&state.db)
+        .await
+        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+
+    if updated.rows_affected() == 0 {
+        return Err(AppError::NotFound(format!("Repository {} not found", id)));
+    }
+
+    Ok(Json(json!({
+        "repo_id": id.to_string(),
+        "status": "terminated",
+        "message": "Analysis termination requested. In-flight work will stop at the next checkpoint.",
+    })))
 }
 
 // ── Helpers ───────────────────────────────────────────────
 
 async fn ensure_repo_exists(state: &Arc<AppState>, id: Uuid) -> Result<(), AppError> {
-    let row = sqlx::query("SELECT EXISTS(SELECT 1 FROM repos WHERE id = $1) AS exists")
+    match sqlx::query("SELECT 1 FROM repos WHERE id = $1")
         .bind(id)
-        .fetch_one(&state.db)
-        .await?;
-    let exists: bool = row.try_get("exists").unwrap_or(false);
-    if !exists {
-        return Err(AppError::NotFound(format!("Repository {} not found", id)));
+        .fetch_optional(&state.db)
+        .await {
+        Ok(Some(_)) => Ok(()),
+        Ok(None) => Err(AppError::NotFound(format!("Repository {} not found", id))),
+        Err(e) => Err(AppError::DatabaseError(e.to_string())),
     }
-    Ok(())
 }
 
 async fn fetch_intent_rows(
@@ -296,23 +338,29 @@ async fn fetch_intent_rows(
     node_type: Option<&str>,
 ) -> Result<Vec<IntentRow>, AppError> {
     let sql_rows = if let Some(nt) = node_type {
-        sqlx::query(
+        match sqlx::query(
             "SELECT id::text, node_type, title, summary, reasoning,
                     contributors, source_refs, timestamp::text, confidence
              FROM intent_nodes WHERE repo_id = $1 AND node_type = $2
              ORDER BY timestamp ASC NULLS LAST",
         )
         .bind(id).bind(nt)
-        .fetch_all(&state.db).await?
+        .fetch_all(&state.db).await {
+            Ok(rows) => rows,
+            Err(e) => return Err(AppError::DatabaseError(e.to_string())),
+        }
     } else {
-        sqlx::query(
+        match sqlx::query(
             "SELECT id::text, node_type, title, summary, reasoning,
                     contributors, source_refs, timestamp::text, confidence
              FROM intent_nodes WHERE repo_id = $1
              ORDER BY timestamp ASC NULLS LAST",
         )
         .bind(id)
-        .fetch_all(&state.db).await?
+        .fetch_all(&state.db).await {
+            Ok(rows) => rows,
+            Err(e) => return Err(AppError::DatabaseError(e.to_string())),
+        }
     };
 
     let rows = sql_rows.iter().map(|r| IntentRow {

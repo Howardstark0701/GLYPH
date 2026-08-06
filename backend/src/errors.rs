@@ -13,7 +13,20 @@ pub enum AppError {
     DatabaseError(String),
     NotFound(String),
     BadRequest(String),
+    Cancelled,
     Internal(String),
+}
+
+impl std::fmt::Display for AppError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let msg = match self {
+            AppError::MissingCredentials => "Missing GitHub token or NIM API key".to_string(),
+            AppError::GitHubApiError(m) | AppError::NimApiError(m) | AppError::DatabaseError(m) => m.clone(),
+            AppError::NotFound(m) | AppError::BadRequest(m) | AppError::Internal(m) => m.clone(),
+            AppError::Cancelled => "Analysis terminated by user".to_string(),
+        };
+        f.write_str(&msg)
+    }
 }
 
 impl IntoResponse for AppError {
@@ -27,6 +40,7 @@ impl IntoResponse for AppError {
             AppError::DatabaseError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
             AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
             AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
+            AppError::Cancelled => (StatusCode::ACCEPTED, "Analysis terminated".into()),
             AppError::Internal(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
         };
 

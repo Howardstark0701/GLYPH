@@ -1,23 +1,26 @@
 mod api;
-mod db;
 mod errors;
 mod ingestion;
 mod intelligence;
 mod processing;
 
-use axum::{
-    http::{HeaderValue, Method},
-    Router,
-    routing::get,
-};
-use sqlx::PgPool;
-use std::sync::Arc;
+use axum::{http::HeaderValue, routing::get, Router};
+use std::collections::HashMap;
+use std::sync::{Arc, atomic::AtomicBool};
 use tower_http::cors::{Any, CorsLayer};
+use uuid::Uuid;
+
+use axum::http::Method;
 
 pub struct AppState {
-    pub db:          PgPool,
-    pub http_client: reqwest::Client,
+    pub db:           PgPool,
+    pub http_client:  reqwest::Client,
+    /// Cancel flags for in-flight analyses, keyed by repo id. The terminate
+    /// endpoint flips the flag; run_analysis checks it between phases.
+    pub cancellations: std::sync::Mutex<HashMap<Uuid, Arc<AtomicBool>>>,
 }
+
+use sqlx::PgPool;
 
 #[tokio::main]
 async fn main() {
@@ -48,9 +51,10 @@ async fn main() {
     let state = Arc::new(AppState {
         db: pool,
         http_client: reqwest::Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
+            .timeout(std::time::Duration::from_secs(60))
             .build()
             .expect("Failed to build HTTP client"),
+        cancellations: std::sync::Mutex::new(HashMap::new()),
     });
 
     // CORS ─────────────────────────────────────────────────
@@ -72,9 +76,10 @@ async fn main() {
         .allow_headers(Any);
 
     // Router ───────────────────────────────────────────────
+    // Health probe + the whole API surface (all routes live in api::routes).
     let router = Router::new()
         .route("/health", get(|| async { "OK" }))
-        .nest("/api", api::routes(state))
+        .nest("/api", api::routes(Arc::clone(&state)))
         .layer(cors);
 
     // Bind ─────────────────────────────────────────────────

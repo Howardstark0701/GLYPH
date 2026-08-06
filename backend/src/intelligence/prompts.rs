@@ -6,7 +6,9 @@ For each batch of events, identify:
 3. Rejection records — what was tried, built, or proposed then abandoned
 4. Architectural intent — why the codebase structure is what it is
 
-Return a JSON array of objects with fields: node_type, title, summary, reasoning, contributors, source_refs, confidence."#;
+Use the review threads, PR comments, and issue comments as first-class evidence: approval and request-changes reviews reveal what was contested and what won. The chronological timeline tells you ordering — decisions precede and succeed each other.
+
+Return a JSON array of objects with fields: node_type, title, summary, reasoning, contributors, source_refs, confidence. Prefer node_type values of exactly one of: "decision", "debate", "rejection", "architectural"."#;
 
 pub fn build_analysis_prompt(events_json: &str) -> String {
     format!(
