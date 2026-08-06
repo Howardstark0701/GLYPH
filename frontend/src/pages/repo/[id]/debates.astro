@@ -23,7 +23,12 @@ try {
 
 const repoSlug = `${repoOwner}/${repoName}`;
 
-// ── Static debate data (from GET /repo/:id/debates in prod) ──
+// A UUID job id means this is a REAL analysis — the seed data below is only
+// rendered for demo/slug URLs. Real jobs render honest placeholders and the
+// client hydrates every panel from GET /api/repo/:id/debates.
+const IS_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id ?? '');
+
+// ── Static debate data (demo/slug URLs only) ──
 const debateThread = {
   prNumber:  442,
   topic:     'AUTH_REDESIGN',
@@ -325,6 +330,17 @@ const statusColor = debateThread.status === 'HEATED'
       width: 100%; aspect-ratio: 1;
       flex: 1;
     }
+    .hm-label {
+      width: 56px; flex: 0 0 56px; margin-right: 4px;
+      font-family:'JetBrains Mono',monospace; font-size:0.5rem;
+      color:#a1a1a1; line-height:1; overflow:hidden;
+      text-overflow:ellipsis; white-space:nowrap; align-self:center;
+    }
+    .hm-empty {
+      margin:auto; text-align:center;
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      letter-spacing:0.1em; color:#a1a1a1;
+    }
     #density-stats {
       border-top: 1px solid #262626;
       padding: 8px 14px; flex-shrink: 0;
@@ -354,6 +370,11 @@ const statusColor = debateThread.status === 'HEATED'
     #profiles-cards {
       flex: 1; display: grid; grid-template-columns: repeat(3, 1fr);
       overflow: hidden;
+    }
+    .profiles-loading {
+      grid-column: 1 / -1; margin:auto; text-align:center;
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      letter-spacing:0.1em; color:#a1a1a1;
     }
     .profile-card {
       background: #0e0e0e;
@@ -602,14 +623,29 @@ const statusColor = debateThread.status === 'HEATED'
           </p>
         </div>
         <div class="header-stats" aria-label="Analysis metrics">
-          <div class="stat-block" aria-label="Throttle level: 98.4 percent">
-            <span class="stat-label">THROTTLE_LEVEL</span>
-            <span class="stat-value">98.4%</span>
-          </div>
-          <div class="stat-block" aria-label="Risk index: Critical">
-            <span class="stat-label">RISK_INDEX</span>
-            <span class="stat-value critical">CRITICAL</span>
-          </div>
+          {IS_UUID ? (
+            <>
+              <div class="stat-block" aria-label="Total debates">
+                <span class="stat-label">TOTAL_DEBATES</span>
+                <span class="stat-value" id="hs-total">—</span>
+              </div>
+              <div class="stat-block" aria-label="Average confidence">
+                <span class="stat-label">AVG_CONFIDENCE</span>
+                <span class="stat-value" id="hs-conf">—</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div class="stat-block" aria-label="Throttle level: 98.4 percent">
+                <span class="stat-label">THROTTLE_LEVEL</span>
+                <span class="stat-value">98.4%</span>
+              </div>
+              <div class="stat-block" aria-label="Risk index: Critical">
+                <span class="stat-label">RISK_INDEX</span>
+                <span class="stat-value critical">CRITICAL</span>
+              </div>
+            </>
+          )}
         </div>
       </header>
 
@@ -626,22 +662,45 @@ const statusColor = debateThread.status === 'HEATED'
             <svg id="sentiment-svg" aria-label="Sentiment activity bar chart" role="img"></svg>
           </div>
           <div id="sentiment-metrics">
-            <div class="sm-col" aria-label={`Agreement: ${sentimentMetrics.agreement}%`}>
-              <div class="sm-label">AGREEMENT</div>
-              <div class="sm-value">{sentimentMetrics.agreement}%</div>
-            </div>
-            <div class="sm-col" aria-label={`Contention: ${sentimentMetrics.contention}%`}>
-              <div class="sm-label">CONTENTION</div>
-              <div class="sm-value">{sentimentMetrics.contention}%</div>
-            </div>
-            <div class="sm-col" aria-label={`Redundancy: ${sentimentMetrics.redundancy}%`}>
-              <div class="sm-label">REDUNDANCY</div>
-              <div class="sm-value">{sentimentMetrics.redundancy}%</div>
-            </div>
-            <div class="sm-col" aria-label={`Unresolved: ${sentimentMetrics.unresolved}%`}>
-              <div class="sm-label">UNRESOLVED</div>
-              <div class="sm-value">{sentimentMetrics.unresolved}%</div>
-            </div>
+            {IS_UUID ? (
+              <>
+                <div class="sm-col" aria-label="Agreement">
+                  <div class="sm-label">AGREEMENT</div>
+                  <div class="sm-value" id="sm-agreement">—</div>
+                </div>
+                <div class="sm-col" aria-label="Contention">
+                  <div class="sm-label">CONTENTION</div>
+                  <div class="sm-value" id="sm-contention">—</div>
+                </div>
+                <div class="sm-col" aria-label="Unique debate topics">
+                  <div class="sm-label">TOPIC_CLUSTERS</div>
+                  <div class="sm-value" id="sm-topics">—</div>
+                </div>
+                <div class="sm-col" aria-label="Low confidence debates">
+                  <div class="sm-label">LOW_CONF</div>
+                  <div class="sm-value" id="sm-lowconf">—</div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div class="sm-col" aria-label={`Agreement: ${sentimentMetrics.agreement}%`}>
+                  <div class="sm-label">AGREEMENT</div>
+                  <div class="sm-value">{sentimentMetrics.agreement}%</div>
+                </div>
+                <div class="sm-col" aria-label={`Contention: ${sentimentMetrics.contention}%`}>
+                  <div class="sm-label">CONTENTION</div>
+                  <div class="sm-value">{sentimentMetrics.contention}%</div>
+                </div>
+                <div class="sm-col" aria-label={`Redundancy: ${sentimentMetrics.redundancy}%`}>
+                  <div class="sm-label">REDUNDANCY</div>
+                  <div class="sm-value">{sentimentMetrics.redundancy}%</div>
+                </div>
+                <div class="sm-col" aria-label={`Unresolved: ${sentimentMetrics.unresolved}%`}>
+                  <div class="sm-label">UNRESOLVED</div>
+                  <div class="sm-value">{sentimentMetrics.unresolved}%</div>
+                </div>
+              </>
+            )}
           </div>
         </section>
 
@@ -650,33 +709,54 @@ const statusColor = debateThread.status === 'HEATED'
           <div class="panel-header">
             <span class="ph-left" id="density-label">INTERACTION_DENSITY</span>
           </div>
-          <div id="heatmap-grid" aria-label="Contributor interaction heatmap" role="img">
-            {heatValues.map((row, ri) => (
-              <div class="hm-row">
-                {row.map((val, ci) => {
-                  // Threshold-based fill: >0.55 → red, else dark grey
-                  const bg = val > 0.55 ? '#cc0000' : val > 0.3 ? '#2a2a2a' : '#1a1a1a';
-                  const opacity = val > 0.55 ? (0.4 + val * 0.6).toFixed(2) : '1';
-                  return (
-                    <div
-                      class="hm-cell"
-                      style={`background:${bg};opacity:${opacity};`}
-                      aria-hidden="true"
-                    ></div>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
+          {IS_UUID ? (
+            <div id="heatmap-grid" aria-label="Contributor-debate participation matrix" role="img">
+              <div id="heatmap-body" class="hm-empty">SYNCING_INTERACTION_MATRIX…</div>
+            </div>
+          ) : (
+            <div id="heatmap-grid" aria-label="Contributor interaction heatmap" role="img">
+              {heatValues.map((row, ri) => (
+                <div class="hm-row">
+                  {row.map((val, ci) => {
+                    // Threshold-based fill: >0.55 → red, else dark grey
+                    const bg = val > 0.55 ? '#cc0000' : val > 0.3 ? '#2a2a2a' : '#1a1a1a';
+                    const opacity = val > 0.55 ? (0.4 + val * 0.6).toFixed(2) : '1';
+                    return (
+                      <div
+                        class="hm-cell"
+                        style={`background:${bg};opacity:${opacity};`}
+                        aria-hidden="true"
+                      ></div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          )}
           <div id="density-stats">
-            <div class="ds-row" aria-label={`Total comments: ${heatmapStats.totalComments}`}>
-              <span class="ds-label">TOTAL_COMMENTS:</span>
-              <span class="ds-value">{heatmapStats.totalComments}</span>
-            </div>
-            <div class="ds-row" aria-label={`Average depth: ${heatmapStats.averageDepth}`}>
-              <span class="ds-label">AVERAGE_DEPTH:</span>
-              <span class="ds-value">{heatmapStats.averageDepth}</span>
-            </div>
+            {IS_UUID ? (
+              <>
+                <div class="ds-row" aria-label="Total debate threads">
+                  <span class="ds-label">TOTAL_DEBATES:</span>
+                  <span class="ds-value" id="ds-total">—</span>
+                </div>
+                <div class="ds-row" aria-label="Average participants per debate">
+                  <span class="ds-label">AVG_PARTICIPANTS:</span>
+                  <span class="ds-value" id="ds-participants">—</span>
+                </div>
+              </>
+            ) : (
+              <>
+                <div class="ds-row" aria-label={`Total comments: ${heatmapStats.totalComments}`}>
+                  <span class="ds-label">TOTAL_COMMENTS:</span>
+                  <span class="ds-value">{heatmapStats.totalComments}</span>
+                </div>
+                <div class="ds-row" aria-label={`Average depth: ${heatmapStats.averageDepth}`}>
+                  <span class="ds-label">AVERAGE_DEPTH:</span>
+                  <span class="ds-value">{heatmapStats.averageDepth}</span>
+                </div>
+              </>
+            )}
           </div>
         </aside>
 
@@ -686,31 +766,35 @@ const statusColor = debateThread.status === 'HEATED'
             <span class="profiles-label" id="profiles-label">KEY_ACTOR_PROFILES</span>
           </div>
           <div id="profiles-cards" role="list" aria-label="Key contributor profiles">
-            {contributors.map((c) => {
-              const initials = c.handle.split('_').map(w => w[0]).join('').toUpperCase().slice(0, 2);
-              return (
-                <div class="profile-card" role="listitem" aria-label={`Contributor: ${c.handle}`}>
-                  <div class="profile-top">
-                    <div class="profile-avatar" aria-hidden="true">
-                      <span class="profile-avatar-initials">{initials}</span>
+            {IS_UUID ? (
+              <div id="profiles-live" class="profiles-loading">AGGREGATING_PARTICIPANTS…</div>
+            ) : (
+              contributors.map((c) => {
+                const initials = c.handle.split('_').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+                return (
+                  <div class="profile-card" role="listitem" aria-label={`Contributor: ${c.handle}`}>
+                    <div class="profile-top">
+                      <div class="profile-avatar" aria-hidden="true">
+                        <span class="profile-avatar-initials">{initials}</span>
+                      </div>
+                      <div class="profile-info">
+                        <span class="profile-handle">{c.handle}</span>
+                        <span class="profile-role-chip" role="status">{c.role}</span>
+                      </div>
                     </div>
-                    <div class="profile-info">
-                      <span class="profile-handle">{c.handle}</span>
-                      <span class="profile-role-chip" role="status">{c.role}</span>
+                    <div class="profile-metric" aria-label={`${c.metric.label}: ${c.metric.pct}%`}>
+                      <div class="metric-header-row">
+                        <span class="metric-lbl">{c.metric.label}</span>
+                        <span class="metric-pct">{c.metric.pct}%</span>
+                      </div>
+                      <div class="metric-track" aria-hidden="true">
+                        <div class="metric-fill" style={`width:${c.metric.pct}%`}></div>
+                      </div>
                     </div>
                   </div>
-                  <div class="profile-metric" aria-label={`${c.metric.label}: ${c.metric.pct}%`}>
-                    <div class="metric-header-row">
-                      <span class="metric-lbl">{c.metric.label}</span>
-                      <span class="metric-pct">{c.metric.pct}%</span>
-                    </div>
-                    <div class="metric-track" aria-hidden="true">
-                      <div class="metric-fill" style={`width:${c.metric.pct}%`}></div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </section>
 
@@ -722,35 +806,44 @@ const statusColor = debateThread.status === 'HEATED'
             <span style="margin-left:auto;font-family:'JetBrains Mono',monospace;font-size:0.55rem;color:#a1a1a1;letter-spacing:0.06em;">BAUDRATE: 115200</span>
           </div>
           <div id="feed-body" role="log" aria-label="Live analysis feed" aria-live="polite">
-            <div class="feed-line">
-              <span class="f-ts">[14:22:01]</span>
-              <span class="f-info"> INFO: Scanning thread PR_<span class="f-em">{debateThread.prNumber}</span>...</span>
-            </div>
-            <div class="feed-line">
-              <span class="f-ts">[14:22:03]</span>
-              <span class="f-alert"> ALERT: High-frequency interaction detected between </span>
-              <span class="f-em">'{contributors[0].handle}'</span><span class="f-info"> and </span><span class="f-em">'{contributors[1].handle}'</span><span class="f-info">.</span>
-            </div>
-            <div class="feed-line">
-              <span class="f-ts">[14:22:05]</span>
-              <span class="f-info"> ANALYSIS: Conflict centered on </span><span class="f-em">AUTH_REDESIGN</span><span class="f-info"> in core module.</span>
-            </div>
-            <div class="feed-line" style="font-weight:700;">
-              <span class="f-ts">[14:22:08]</span>
-              <span class="f-alert"> DATA: Hostility index rising: </span><span class="f-em">+12.4%</span><span class="f-info"> in last 10 minutes.</span>
-            </div>
-            <div class="feed-line" style="color:#cc0000;font-weight:700;">
-              <span class="f-ts">[14:22:12]</span>
-              <span> CRITICAL: Logical recursion detected in </span><span class="f-em">'{contributors[1].handle}'</span><span> argument. Conflict resolution recommended.</span>
-            </div>
-            <div class="feed-line" style="opacity:0.5;">
-              <span class="f-ts">[14:22:15]</span>
-              <span class="f-info"> INFO: Mapping user metadata clusters...</span>
-            </div>
-            <div class="feed-line f-pulse">
-              <span class="f-ts">[14:22:18]</span>
-              <span class="f-info"> SYS: Listening for incoming buffer_overflow_warnings..._</span>
-            </div>
+            {IS_UUID ? (
+              <div class="feed-line f-pulse">
+                <span class="f-ts">{'[--:--:--]'}</span>
+                <span class="f-info"> SYS: Awaiting analysis status stream..._</span>
+              </div>
+            ) : (
+              <>
+                <div class="feed-line">
+                  <span class="f-ts">[14:22:01]</span>
+                  <span class="f-info"> INFO: Scanning thread PR_<span class="f-em">{debateThread.prNumber}</span>...</span>
+                </div>
+                <div class="feed-line">
+                  <span class="f-ts">[14:22:03]</span>
+                  <span class="f-alert"> ALERT: High-frequency interaction detected between </span>
+                  <span class="f-em">'{contributors[0].handle}'</span><span class="f-info"> and </span><span class="f-em">'{contributors[1].handle}'</span><span class="f-info">.</span>
+                </div>
+                <div class="feed-line">
+                  <span class="f-ts">[14:22:05]</span>
+                  <span class="f-info"> ANALYSIS: Conflict centered on </span><span class="f-em">AUTH_REDESIGN</span><span class="f-info"> in core module.</span>
+                </div>
+                <div class="feed-line" style="font-weight:700;">
+                  <span class="f-ts">[14:22:08]</span>
+                  <span class="f-alert"> DATA: Hostility index rising: </span><span class="f-em">+12.4%</span><span class="f-info"> in last 10 minutes.</span>
+                </div>
+                <div class="feed-line" style="color:#cc0000;font-weight:700;">
+                  <span class="f-ts">[14:22:12]</span>
+                  <span> CRITICAL: Logical recursion detected in </span><span class="f-em">'{contributors[1].handle}'</span><span> argument. Conflict resolution recommended.</span>
+                </div>
+                <div class="feed-line" style="opacity:0.5;">
+                  <span class="f-ts">[14:22:15]</span>
+                  <span class="f-info"> INFO: Mapping user metadata clusters...</span>
+                </div>
+                <div class="feed-line f-pulse">
+                  <span class="f-ts">[14:22:18]</span>
+                  <span class="f-info"> SYS: Listening for incoming buffer_overflow_warnings..._</span>
+                </div>
+              </>
+            )}
           </div>
         </section>
 
@@ -764,6 +857,11 @@ const statusColor = debateThread.status === 'HEATED'
   <script define:vars={{ sentimentBars, prNumber: debateThread.prNumber, contributors }}>
     import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed } from '../../../scripts/repo-view';
     const API_BASE = apiBase();
+
+    function nowTs() {
+      const d = new Date();
+      return `[${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}]`;
+    }
     // ── Execute fetch ─────────────────────────────────────
     (function() {
       const btn = document.getElementById('execute-fetch');
@@ -774,34 +872,86 @@ const statusColor = debateThread.status === 'HEATED'
       });
     })();
 
-    // ── Hydrate thread header + metrics from real API ─────
+    // ── Hydrate ALL panels from real API ──────────────────
+    // Real jobs (UUID ids) get every panel rendered from
+    // GET /api/repo/:id/debates — no seed values survive.
     (function hydrateDebates() {
       const jobId = getJobId();
       if (!jobId) return;
 
-      fetch(`${API_BASE}/api/repo/${jobId}/debates`)
-        .then(r => r.ok ? r.json() : null)
-        .then(data => {
-          const m = data?.metrics;
-          const first = Array.isArray(data?.debates) ? data.debates[0] : null;
+      const setText = (id: string, val: string) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+      };
 
-          if (!m || (!m.agreement_pct && !m.contention_pct)) {
+      fetch(`${API_BASE}/api/repo/${jobId}/debates`)
+        .then(r => (r.ok ? r.json() : null))
+        .then(data => {
+          const debates = Array.isArray(data?.debates) ? data.debates : [];
+          const m = data?.metrics ?? {};
+
+          // ── No measurable debate threads → honest empty state ──
+          if (!debates.length) {
             const feed = document.getElementById('feed-body');
-            showEmptyState(feed, 'NO_DEBATE_METRICS',
+            showEmptyState(feed, 'NO_DEBATE_THREADS',
               'This analysis surfaced no measurable debate threads for this repository.');
+            const heat = document.getElementById('heatmap-body');
+            if (heat) heat.textContent = 'NO_DEBATES_DETECTED';
             return;
           }
 
-          // Update sentiment metrics that the API actually reports.
-          // REDUNDANCY / UNRESOLVED have no backend source — left as page chrome.
-          const cols = document.querySelectorAll('.sm-value');
-          if (cols[0]) cols[0].textContent = `${m.agreement_pct ?? 0}%`;
-          if (cols[1]) cols[1].textContent = `${m.contention_pct ?? 0}%`;
+          const total = debates.length;
+          const confidence = (d: any) => d.confidence ?? 0;
+          const avgConf = Math.round(
+            (debates.reduce((s, d) => s + confidence(d), 0) / total) * 100
+          );
+          const bars = debates.map(d => Math.round(confidence(d) * 100));
+          const topics = new Set(
+            debates.map(d => (d.title ?? '').trim().toLowerCase()).filter(Boolean)
+          ).size;
+          const lowConf = debates.filter(d => confidence(d) < 0.5).length;
 
-          // Update thread identity from the lead debate
+          // Contributor participation across threads.
+          const participation = new Map<string, number>();
+          const perThread = new Map<string, Set<number>>();
+          debates.forEach((d, i) => {
+            const list = Array.isArray(d.contributors) ? d.contributors : [];
+            for (const h of list) {
+              participation.set(h, (participation.get(h) ?? 0) + 1);
+              if (!perThread.has(h)) perThread.set(h, new Set());
+              perThread.get(h)!.add(i);
+            }
+          });
+          const ranked = [...participation.entries()].sort((a, b) => b[1] - a[1]);
+          const topHandles = ranked.slice(0, 12).map(([h]) => h);
+          const avgParticipants = debates.reduce(
+            (s, d) => s + (Array.isArray(d.contributors) ? d.contributors.length : 0),
+            0
+          ) / total;
+
+          // Expose real bars to the D3 chart module (separate script block).
+          (window as any).__GLYPH_DEBATES__ = { bars, count: total };
+          window.dispatchEvent(new CustomEvent('glyph:debates-updated'));
+
+          // ── Header stats ──
+          setText('hs-total', String(total));
+          setText('hs-conf', `${avgConf}%`);
+
+          // ── Sentiment / contention metrics ──
+          setText('sm-agreement', `${m.agreement_pct ?? 0}%`);
+          setText('sm-contention', `${m.contention_pct ?? 0}%`);
+          setText('sm-topics', String(topics));
+          setText('sm-lowconf', String(lowConf));
+
+          // ── Density stats ──
+          setText('ds-total', String(total));
+          setText('ds-participants', avgParticipants ? avgParticipants.toFixed(1) : '—');
+
+          // ── Thread identity from the lead debate ──
+          const first = debates[0];
           const threadId = document.querySelector('.thread-id');
           if (threadId) {
-            const pr    = first?.source_refs?.[0]?.ref ?? 'N/A';
+            const pr    = first?.source_refs?.[0] ?? 'N/A';
             const topic = (first?.title ?? 'UNKNOWN_DEBATE').toUpperCase().replace(/\s+/g, '_');
             const contention = m.contention_pct ?? 0;
             const status = contention >= 50 ? 'HEATED' : contention >= 20 ? 'ACTIVE' : 'RESOLVED';
@@ -812,6 +962,80 @@ const statusColor = debateThread.status === 'HEATED'
               `STATUS: <span class="thread-status" style="color: ${statusColor}">${status}</span>`;
           }
 
+          // ── Interaction heatmap: contributor × debate participation ──
+          const heat = document.getElementById('heatmap-body');
+          if (heat) {
+            if (!topHandles.length) {
+              heat.className = 'hm-empty';
+              heat.textContent = 'NO_PARTICIPANTS_DETECTED';
+            } else {
+              const rows = topHandles.slice(0, 10);
+              const cols = Math.min(debates.length, 24);
+              let html = '';
+              rows.forEach((h) => {
+                const set = perThread.get(h) ?? new Set<number>();
+                let cells = '';
+                for (let c = 0; c < cols; c++) {
+                  const active = set.has(c);
+                  cells += active
+                    ? '<div class="hm-cell" style="background:#cc0000;opacity:0.85;" aria-hidden="true"></div>'
+                    : '<div class="hm-cell" style="background:#1a1a1a;opacity:0.4;" aria-hidden="true"></div>';
+                }
+                const short = h.replace(/^@/, '').slice(0, 10);
+                html += `<div class="hm-row"><span class="hm-label" title="${h}">${short}</span>${cells}</div>`;
+              });
+              heat.className = '';
+              heat.innerHTML = html;
+            }
+          }
+
+          // ── Key actor profiles: top participants by debate count ──
+          const profiles = document.getElementById('profiles-live');
+          if (profiles) {
+            if (!ranked.length) {
+              profiles.className = 'profiles-loading';
+              profiles.textContent = 'NO_DISTINCT_PARTICIPANTS_IN_DEBATES';
+            } else {
+              profiles.className = '';
+              profiles.innerHTML = ranked.slice(0, 3).map(([handle, count]) => {
+                const clean = handle.replace(/^@/, '');
+                const initials = clean.split(/[^A-Za-z0-9]/).map(w => w[0]).join('')
+                  .toUpperCase().slice(0, 2) || '?';
+                const share = Math.round((count / total) * 100);
+                const engagement = count >= Math.ceil(total / 2)
+                  ? 'HIGH_ENGAGEMENT'
+                  : count >= Math.ceil(total / 4) ? 'ACTIVE' : 'PARTICIPANT';
+                return (
+                  `<div class="profile-card" role="listitem" aria-label="Contributor: ${clean}">` +
+                  `<div class="profile-top">` +
+                  `<div class="profile-avatar" aria-hidden="true"><span class="profile-avatar-initials">${initials}</span></div>` +
+                  `<div class="profile-info">` +
+                  `<span class="profile-handle">${clean}</span>` +
+                  `<span class="profile-role-chip" role="status">${engagement}</span>` +
+                  `</div></div>` +
+                  `<div class="profile-metric" aria-label="Debates participated: ${count} of ${total}">` +
+                  `<div class="metric-header-row"><span class="metric-lbl">DEBATES</span>` +
+                  `<span class="metric-pct">${count}/${total}</span></div>` +
+                  `<div class="metric-track" aria-hidden="true"><div class="metric-fill" style="width:${share}%"></div></div>` +
+                  `</div></div>`
+                );
+              }).join('');
+            }
+          }
+
+          // ── Feed: append an honest findings summary line ──
+          const feed = document.getElementById('feed-body');
+          if (feed) {
+            const line = document.createElement('div');
+            line.className = 'feed-line';
+            line.style.fontWeight = '700';
+            line.innerHTML =
+              `<span class="f-ts">[${nowTs()}]</span> <span style="color:#a1a1a1;">DATA:</span> ` +
+              `<span style="color:#e5e2e1;">FOUND ${total} DEBATE THREAD${total === 1 ? '' : 'S'} · ` +
+              `${avgParticipants.toFixed(1)} PARTICIPANTS AVG · ${avgConf}% AVG CONFIDENCE</span>`;
+            feed.appendChild(line);
+            feed.scrollTop = feed.scrollHeight;
+          }
         })
         .catch(() => {
           const body = document.getElementById('feed-body');
@@ -828,14 +1052,6 @@ const statusColor = debateThread.status === 'HEATED'
       if (getJobId()) {
         startStatusFeed(body);
         return;
-      }
-
-      function nowTs() {
-        const d = new Date();
-        const h = String(d.getHours()).padStart(2, '0');
-        const m = String(d.getMinutes()).padStart(2, '0');
-        const s = String(d.getSeconds()).padStart(2, '0');
-        return `[${h}:${m}:${s}]`;
       }
 
       const handles = contributors.map(c => c.handle);
@@ -893,42 +1109,58 @@ const statusColor = debateThread.status === 'HEATED'
       .attr('viewBox', `0 0 ${W} ${H}`)
       .attr('preserveAspectRatio', 'none');
 
-    const data   = sentimentBars;
-    const maxVal = d3.max(data) ?? 1;
+    // Real jobs (UUID) feed real confidence bars via __GLYPH_DEBATES__;
+    // demo/slug URLs fall back to the static seed.
+    const realBars = () => (window as any).__GLYPH_DEBATES__?.bars;
+    const isReal   = () => Array.isArray(realBars()) && realBars().length > 0;
+    const pickData = () => (isReal() ? realBars() : sentimentBars);
 
-    const x = d3.scaleBand()
-      .domain(data.map((_, i) => String(i)))
-      .range([PAD.left, W - PAD.right])
-      .padding(0.25);
+    function render(data: number[]) {
+      svg.selectAll('*').remove();
 
-    const y = d3.scaleLinear()
-      .domain([0, maxVal])
-      .range([H - PAD.bottom, PAD.top]);
+      const maxVal = d3.max(data) ?? 1;
 
-    // Dotted horizontal gridlines only — 4 levels
-    const gridVals = [0.25, 0.5, 0.75, 1.0].map(f => f * maxVal);
-    svg.append('g').selectAll('line')
-      .data(gridVals)
-      .enter()
-      .append('line')
-      .attr('x1', PAD.left)
-      .attr('x2', W - PAD.right)
-      .attr('y1', d => y(d))
-      .attr('y2', d => y(d))
-      .attr('stroke', '#262626')
-      .attr('stroke-width', 1)
-      .attr('stroke-dasharray', '3 3');
+      const x = d3.scaleBand()
+        .domain(data.map((_, i) => String(i)))
+        .range([PAD.left, W - PAD.right])
+        .padding(0.25);
 
-    // Bars — filled #cc0000, no radius
-    svg.append('g').selectAll('rect')
-      .data(data)
-      .enter()
-      .append('rect')
-      .attr('x',      (_, i) => x(String(i)) ?? 0)
-      .attr('y',      d => y(d))
-      .attr('width',  x.bandwidth())
-      .attr('height', d => H - PAD.bottom - y(d))
-      .attr('fill',   '#cc0000');
+      const y = d3.scaleLinear()
+        .domain([0, maxVal])
+        .range([H - PAD.bottom, PAD.top]);
+
+      // Dotted horizontal gridlines only — 4 levels
+      const gridVals = [0.25, 0.5, 0.75, 1.0].map(f => f * maxVal);
+      svg.append('g').selectAll('line')
+        .data(gridVals)
+        .enter()
+        .append('line')
+        .attr('x1', PAD.left)
+        .attr('x2', W - PAD.right)
+        .attr('y1', d => y(d))
+        .attr('y2', d => y(d))
+        .attr('stroke', '#262626')
+        .attr('stroke-width', 1)
+        .attr('stroke-dasharray', '3 3');
+
+      // Bars — filled #cc0000, no radius
+      svg.append('g').selectAll('rect')
+        .data(data)
+        .enter()
+        .append('rect')
+        .attr('x',      (_, i) => x(String(i)) ?? 0)
+        .attr('y',      d => y(d))
+        .attr('width',  x.bandwidth())
+        .attr('height', d => H - PAD.bottom - y(d))
+        .attr('fill',   '#cc0000');
+    }
+
+    render(pickData());
+
+    // Re-render when the async hydrate completes for real jobs.
+    window.addEventListener('glyph:debates-updated', () => {
+      if (isReal()) render(realBars());
+    });
   </script>
 
   <!-- Bottom status bar -->

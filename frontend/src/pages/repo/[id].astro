@@ -5,6 +5,11 @@ export const prerender = false;
 
 const { id } = Astro.params;
 
+// A UUID job id means this is a REAL analysis. Demo chrome (seed callouts,
+// probability matrix, neural forecast) is only rendered for slug URLs; real
+// jobs render honest placeholders that the client hydrates from the API.
+const IS_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id ?? '');
+
 // Decode the repo URL/id and extract owner/name
 let repoOwner = 'unknown';
 let repoName  = 'unknown';
@@ -851,30 +856,36 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
           <div id="graph-container" role="img" aria-label="Interactive decision graph">
             <svg id="graph-svg" aria-hidden="true"></svg>
 
-            <!-- Conflict callouts (visible until real graph loads) -->
-            <div class="conflict-callout active-branch" style="top:25%;left:30%;" aria-hidden="true">
-              <div class="callout-label">BRANCH_A // KERNEL</div>
-              <div class="callout-hash">H_HASH: 0x9f22...</div>
-              <div class="callout-underline"></div>
-            </div>
-            <div class="conflict-callout passive-branch" style="bottom:30%;right:22%;" aria-hidden="true">
-              <div class="callout-label muted">BRANCH_B // USER_AUTH</div>
-              <div class="callout-hash">H_HASH: 0xc41b...</div>
-              <div class="callout-underline muted"></div>
-            </div>
+            <!-- Conflict callouts — decorative demo chrome, never on real jobs -->
+            {!IS_UUID && (
+              <>
+                <div class="conflict-callout active-branch" style="top:25%;left:30%;" aria-hidden="true">
+                  <div class="callout-label">BRANCH_A // KERNEL</div>
+                  <div class="callout-hash">H_HASH: 0x9f22...</div>
+                  <div class="callout-underline"></div>
+                </div>
+                <div class="conflict-callout passive-branch" style="bottom:30%;right:22%;" aria-hidden="true">
+                  <div class="callout-label muted">BRANCH_B // USER_AUTH</div>
+                  <div class="callout-hash">H_HASH: 0xc41b...</div>
+                  <div class="callout-underline muted"></div>
+                </div>
 
-            <!-- SVG connection between callouts -->
-            <svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.3;pointer-events:none;" aria-hidden="true">
-              <line x1="33%" y1="25%" x2="75%" y2="66%" stroke="#cc0000" stroke-width="1" stroke-dasharray="4"/>
-              <circle class="node-pulse" cx="33%" cy="25%" r="3" fill="#cc0000"/>
-              <circle cx="75%" cy="66%" r="3" fill="#cc0000"/>
-            </svg>
+                <!-- SVG connection between callouts -->
+                <svg style="position:absolute;inset:0;width:100%;height:100%;opacity:0.3;pointer-events:none;" aria-hidden="true">
+                  <line x1="33%" y1="25%" x2="75%" y2="66%" stroke="#cc0000" stroke-width="1" stroke-dasharray="4"/>
+                  <circle class="node-pulse" cx="33%" cy="25%" r="3" fill="#cc0000"/>
+                  <circle cx="75%" cy="66%" r="3" fill="#cc0000"/>
+                </svg>
+              </>
+            )}
 
-            <div id="graph-pagination" aria-label="Graph layer controls" role="group">
-              <div class="page-dot active" role="button" tabindex="0" aria-label="Layer 1" aria-pressed="true"></div>
-              <div class="page-dot" role="button" tabindex="0" aria-label="Layer 2" aria-pressed="false"></div>
-              <div class="page-dot" role="button" tabindex="0" aria-label="Layer 3" aria-pressed="false"></div>
-            </div>
+            {!IS_UUID && (
+              <div id="graph-pagination" aria-label="Graph layer controls" role="group">
+                <div class="page-dot active" role="button" tabindex="0" aria-label="Layer 1" aria-pressed="true"></div>
+                <div class="page-dot" role="button" tabindex="0" aria-label="Layer 2" aria-pressed="false"></div>
+                <div class="page-dot" role="button" tabindex="0" aria-label="Layer 3" aria-pressed="false"></div>
+              </div>
+            )}
 
             <!-- Real status overlay — replaces demo data on failure/empty/pending -->
             <div id="graph-state" hidden aria-live="polite">
@@ -887,52 +898,101 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
         <!-- ── INTELLIGENCE SIDEBAR ────────────────────── -->
         <aside id="intel-panel" aria-label="Intelligence analysis">
 
-          <!-- Probability matrix -->
-          <div class="intel-section">
-            <span class="intel-label">PROBABILITY_MATRIX_X</span>
+          {IS_UUID ? (
+            <>
+              <!-- Graph metrics (hydrated from GET /graph) -->
+              <div class="intel-section">
+                <span class="intel-label">GRAPH_METRICS</span>
 
-            <div class="metric-row" role="group" aria-label="Reconstruction success metric">
-              <div class="metric-header">
-                <span class="metric-name">RECONSTRUCTION_SUCCESS</span>
-                <span class="metric-pct">82.4%</span>
-              </div>
-              <div class="metric-bar-track" aria-hidden="true">
-                <div class="metric-bar-fill" style="width:82.4%"></div>
-              </div>
-            </div>
+                <div class="metric-row" role="group" aria-label="Total intent nodes">
+                  <div class="metric-header">
+                    <span class="metric-name">NODES_TOTAL</span>
+                    <span class="metric-pct" id="intel-nodes">—</span>
+                  </div>
+                  <div class="metric-bar-track" aria-hidden="true">
+                    <div class="metric-bar-fill" id="intel-nodes-fill" style="width:0%"></div>
+                  </div>
+                </div>
 
-            <div class="metric-row" role="group" aria-label="Intent confidence metric">
-              <div class="metric-header">
-                <span class="metric-name">INTENT_CONFIDENCE</span>
-                <span class="metric-pct">14.1%</span>
-              </div>
-              <div class="metric-bar-track" aria-hidden="true">
-                <div class="metric-bar-fill" style="width:14.1%"></div>
-              </div>
-            </div>
+                <div class="metric-row" role="group" aria-label="Graph link count">
+                  <div class="metric-header">
+                    <span class="metric-name">LINK_COUNT</span>
+                    <span class="metric-pct" id="intel-links">—</span>
+                  </div>
+                  <div class="metric-bar-track" aria-hidden="true">
+                    <div class="metric-bar-fill" id="intel-links-fill" style="width:0%"></div>
+                  </div>
+                </div>
 
-            <div class="metric-row" role="group" aria-label="Debate entropy metric">
-              <div class="metric-header">
-                <span class="metric-name">DEBATE_ENTROPY</span>
-                <span class="metric-pct">3.5%</span>
+                <div class="metric-row" role="group" aria-label="Graph density">
+                  <div class="metric-header">
+                    <span class="metric-name">DENSITY</span>
+                    <span class="metric-pct" id="intel-density">—</span>
+                  </div>
+                  <div class="metric-bar-track" aria-hidden="true">
+                    <div class="metric-bar-fill" id="intel-density-fill" style="width:0%"></div>
+                  </div>
+                </div>
               </div>
-              <div class="metric-bar-track" aria-hidden="true">
-                <div class="metric-bar-fill" style="width:3.5%"></div>
-              </div>
-            </div>
-          </div>
 
-          <!-- Neural forecast -->
-          <div class="intel-section">
-            <span class="intel-label">NEURAL_FORECAST</span>
-            <p class="forecast-body">
-              PREDICTION: ARCHITECTURAL CONFLICT IN 'AUTH_MODULE' IS UNRESOLVABLE VIA AUTOMATED INFERENCE.
-              MANUAL REVIEW SUGGESTED AT COMMIT <span class="sha-inline">0xf3a91c2</span>.
-            </p>
-            <button id="override-btn" type="button" aria-label="Initialize manual override for architectural conflict">
-              INITIALIZE_OVERRIDE
-            </button>
-          </div>
+              <!-- Forecast: honest until graph data arrives -->
+              <div class="intel-section">
+                <span class="intel-label">NEURAL_FORECAST</span>
+                <p class="forecast-body" id="forecast-body">
+                  AWAITING GRAPH DATA…
+                </p>
+              </div>
+            </>
+          ) : (
+            <>
+              <!-- Probability matrix -->
+              <div class="intel-section">
+                <span class="intel-label">PROBABILITY_MATRIX_X</span>
+
+                <div class="metric-row" role="group" aria-label="Reconstruction success metric">
+                  <div class="metric-header">
+                    <span class="metric-name">RECONSTRUCTION_SUCCESS</span>
+                    <span class="metric-pct">82.4%</span>
+                  </div>
+                  <div class="metric-bar-track" aria-hidden="true">
+                    <div class="metric-bar-fill" style="width:82.4%"></div>
+                  </div>
+                </div>
+
+                <div class="metric-row" role="group" aria-label="Intent confidence metric">
+                  <div class="metric-header">
+                    <span class="metric-name">INTENT_CONFIDENCE</span>
+                    <span class="metric-pct">14.1%</span>
+                  </div>
+                  <div class="metric-bar-track" aria-hidden="true">
+                    <div class="metric-bar-fill" style="width:14.1%"></div>
+                  </div>
+                </div>
+
+                <div class="metric-row" role="group" aria-label="Debate entropy metric">
+                  <div class="metric-header">
+                    <span class="metric-name">DEBATE_ENTROPY</span>
+                    <span class="metric-pct">3.5%</span>
+                  </div>
+                  <div class="metric-bar-track" aria-hidden="true">
+                    <div class="metric-bar-fill" style="width:3.5%"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Neural forecast -->
+              <div class="intel-section">
+                <span class="intel-label">NEURAL_FORECAST</span>
+                <p class="forecast-body">
+                  PREDICTION: ARCHITECTURAL CONFLICT IN 'AUTH_MODULE' IS UNRESOLVABLE VIA AUTOMATED INFERENCE.
+                  MANUAL REVIEW SUGGESTED AT COMMIT <span class="sha-inline">0xf3a91c2</span>.
+                </p>
+                <button id="override-btn" type="button" aria-label="Initialize manual override for architectural conflict">
+                  INITIALIZE_OVERRIDE
+                </button>
+              </div>
+            </>
+          )}
 
         </aside>
 
@@ -1287,9 +1347,10 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
       });
     })();
 
-    // ── Override btn ──────────────────────────────────────
+    // ── Override btn (demo-only; absent on real UUID jobs) ──
     (function initOverride() {
       var btn = document.getElementById('override-btn');
+      if (!btn) return;
       btn.addEventListener('click', function () {
         btn.textContent = 'OVERRIDE_QUEUED';
         setTimeout(function () { btn.textContent = 'INITIALIZE_OVERRIDE'; }, 3000);
@@ -1455,7 +1516,7 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
         const nodes = (data.nodes ?? []).map((n) => ({
           id:    n.id,
           label: (n.label ?? 'UNKNOWN').toUpperCase().replace(/\s+/g, '_').slice(0, 22),
-          sha:   n.sha ?? '0x0000000',
+          sha:   n.sha ?? 'N/A',
           type:  n.type ?? 'unknown',
         }));
         const links = (data.links ?? []).map((l) => ({
@@ -1468,6 +1529,29 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
         const de = document.getElementById('graph-density');
         if (nc) nc.textContent = String(data.meta?.total_nodes ?? nodes.length);
         if (de) de.textContent = String(data.meta?.density_pct ?? 0);
+
+        // Hydrate the honest intel sidebar from real graph metrics.
+        const nn = data.meta?.total_nodes ?? nodes.length;
+        const nl = data.meta?.total_links ?? links.length;
+        const den = data.meta?.density_pct ?? 0;
+        const intelSet = (id: string, fillId: string, val: string, pct: number) => {
+          const v = document.getElementById(id);
+          if (v) v.textContent = val;
+          const f = document.getElementById(fillId);
+          if (f) f.style.width = `${Math.max(0, Math.min(100, pct))}%`;
+        };
+        intelSet('intel-nodes', 'intel-nodes-fill', String(nn), nn ? Math.min(100, Math.round(nn * 6)) : 0);
+        intelSet('intel-links', 'intel-links-fill', String(nl), nl ? Math.min(100, Math.round(nl * 4)) : 0);
+        intelSet('intel-density', 'intel-density-fill', `${den}%`, den);
+        const fb = document.getElementById('forecast-body');
+        if (fb) {
+          const typeCounts: Record<string, number> = {};
+          nodes.forEach((n: any) => { typeCounts[n.type] = (typeCounts[n.type] ?? 0) + 1; });
+          const top = Object.entries(typeCounts).sort((a, b) => b[1] - a[1])[0];
+          fb.textContent = top
+            ? `FORECAST: ${top[1]} ${top[0].toUpperCase()} NODE${top[1] === 1 ? '' : 'S'} (${nn} TOTAL) — GRAPH-DERIVED.`
+            : 'FORECAST: NO INTENT NODES EXTRACTED YET.';
+        }
 
         if (!nodes.length) {
           return { kind: 'empty', code: 'NO_INTENT', msg: 'No intent nodes extracted yet — analysis may still be running.' };

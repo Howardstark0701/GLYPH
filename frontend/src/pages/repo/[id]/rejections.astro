@@ -5,6 +5,10 @@ export const prerender = false;
 
 const { id } = Astro.params;
 
+// A UUID job id means this is a REAL analysis — seed cards only render for
+// slug/demo URLs; real jobs render an honest placeholder hydrated by the client.
+const IS_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id ?? '');
+
 // Decode repo slug from id param
 let repoOwner = 'unknown';
 let repoName  = 'unknown';
@@ -324,6 +328,13 @@ const padIdx = (n: number) => String(n).padStart(3, '0');
       padding: 20px 24px;
       background: #262626; /* gap color from bg bleed */
     }
+    .grid-loading {
+      grid-column: 1 / -1; padding: 60px 0; text-align:center;
+      font-family:'JetBrains Mono',monospace; font-size:0.65rem;
+      letter-spacing:0.1em; color:#a1a1a1;
+      animation: gv-pulse 2s ease-in-out infinite;
+    }
+    @keyframes gv-pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
 
     /* Individual rejection card */
     .rejection-card {
@@ -652,44 +663,48 @@ const padIdx = (n: number) => String(n).padStart(3, '0');
         <!-- Rejection card grid -->
         <div id="card-grid" role="list" aria-label="Rejected propositions">
 
-          {rejections.map((r) => (
-            <article class="rejection-card" role="listitem" aria-label={`Rejection: ${r.title}`}>
+          {IS_UUID ? (
+            <div class="grid-loading">SYNCING_REJECTION_VAULT…</div>
+          ) : (
+            rejections.map((r) => (
+              <article class="rejection-card" role="listitem" aria-label={`Rejection: ${r.title}`}>
 
-              <!-- Top meta row -->
-              <div class="card-meta-row">
-                <span class="card-id" aria-label={`Entry ID: ${repoId}-${padIdx(r.index)}`}>
-                  ID: {repoId}-{padIdx(r.index)}
-                </span>
-                <span class="rejected-chip" role="status" aria-label="Status: Rejected">REJECTED</span>
-              </div>
-
-              <!-- Title -->
-              <h2 class="card-title">{r.title}</h2>
-
-              <!-- Rejection reason (critical cards only) -->
-              {r.reason && (
-                <div class="card-reason-row" aria-label={`Rejection reason: ${r.reason}`}>
-                  <span class="card-reason-label">REJECTION_REASON:</span>
-                  <span class="card-reason-val">{r.reason}</span>
+                <!-- Top meta row -->
+                <div class="card-meta-row">
+                  <span class="card-id" aria-label={`Entry ID: ${repoId}-${padIdx(r.index)}`}>
+                    ID: {repoId}-{padIdx(r.index)}
+                  </span>
+                  <span class="rejected-chip" role="status" aria-label="Status: Rejected">REJECTED</span>
                 </div>
-              )}
 
-              <!-- Divider -->
-              <div class="card-divider" aria-hidden="true"></div>
+                <!-- Title -->
+                <h2 class="card-title">{r.title}</h2>
 
-              <!-- Metadata rows -->
-              <div class="card-data-row" aria-label={`Contributor: @${r.contributor}`}>
-                <span class="card-data-label">CONTRIBUTOR:</span>
-                <span class="card-data-val contributor">@{r.contributor}</span>
-              </div>
+                <!-- Rejection reason (critical cards only) -->
+                {r.reason && (
+                  <div class="card-reason-row" aria-label={`Rejection reason: ${r.reason}`}>
+                    <span class="card-reason-label">REJECTION_REASON:</span>
+                    <span class="card-reason-val">{r.reason}</span>
+                  </div>
+                )}
 
-              <div class="card-data-row" aria-label={`Timestamp: ${r.timestamp}`}>
-                <span class="card-data-label">TIMESTAMP:</span>
-                <span class="card-data-val">{r.timestamp.replace('T', ' ').replace('Z', '')}</span>
-              </div>
+                <!-- Divider -->
+                <div class="card-divider" aria-hidden="true"></div>
 
-            </article>
-          ))}
+                <!-- Metadata rows -->
+                <div class="card-data-row" aria-label={`Contributor: @${r.contributor}`}>
+                  <span class="card-data-label">CONTRIBUTOR:</span>
+                  <span class="card-data-val contributor">@{r.contributor}</span>
+                </div>
+
+                <div class="card-data-row" aria-label={`Timestamp: ${r.timestamp}`}>
+                  <span class="card-data-label">TIMESTAMP:</span>
+                  <span class="card-data-val">{r.timestamp.replace('T', ' ').replace('Z', '')}</span>
+                </div>
+
+              </article>
+            ))
+          )}
 
         </div><!-- /card-grid -->
 
@@ -703,7 +718,7 @@ const padIdx = (n: number) => String(n).padStart(3, '0');
             <span class="live-feed-chip" role="status">LIVE_FEED</span>
           </div>
           <div class="terminal-header-right">
-            ENTRIES: <span id="entry-count">{rejections.length}</span>
+            ENTRIES: <span id="entry-count">{IS_UUID ? '—' : rejections.length}</span>
             &nbsp;&nbsp;
             MEMORY: <span id="memory-pct">0</span>%
           </div>

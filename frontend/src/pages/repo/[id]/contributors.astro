@@ -5,6 +5,11 @@ export const prerender = false;
 
 const { id } = Astro.params;
 
+// A UUID job id means this is a REAL analysis — seed profiles/histograms only
+// render for slug/demo URLs; real jobs render honest placeholders that the
+// client hydrates from GET /api/repo/:id/contributors.
+const IS_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id ?? '');
+
 let repoOwner = 'unknown';
 let repoName  = 'unknown';
 try {
@@ -302,6 +307,13 @@ const initials = (h: string) =>
       overflow-y:auto; padding:16px 20px;
       display:flex; flex-direction:column; gap:12px;
     }
+    .contrib-loading {
+      margin:auto; padding:40px 0; text-align:center;
+      font-family:'JetBrains Mono',monospace; font-size:0.65rem;
+      letter-spacing:0.1em; color:#a1a1a1;
+      animation: cb-pulse 2s ease-in-out infinite;
+    }
+    @keyframes cb-pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
     #contrib-list::-webkit-scrollbar { width: 4px; }
     #contrib-list::-webkit-scrollbar-track { background: #0e0e0e; }
     #contrib-list::-webkit-scrollbar-thumb { background: #cc0000; }
@@ -695,7 +707,10 @@ const initials = (h: string) =>
 
         <!-- ── CONTRIBUTOR LIST ───────────────────────────── -->
         <div id="contrib-list" role="list" aria-label="Contributor profiles">
-          {contributors.map((c) => (
+          {IS_UUID ? (
+            <div class="contrib-loading">SYNCING_CONTRIBUTOR_PROFILES…</div>
+          ) : (
+          contributors.map((c) => (
             <div class="contrib-block" role="listitem" aria-label={`Contributor: ${c.handle}`}>
 
               <!-- Header -->
@@ -754,7 +769,8 @@ const initials = (h: string) =>
               </div>
 
             </div>
-          ))}
+          ))
+          )}
         </div>
 
         <!-- ── RIGHT PANEL ────────────────────────────────── -->
@@ -766,21 +782,21 @@ const initials = (h: string) =>
               <span class="rp-label-dot" aria-hidden="true"></span>
               REGISTRY_STATS
             </div>
-            <div class="rp-stat-row" aria-label={`Total contributors: ${registryStats.total}`}>
+            <div class="rp-stat-row" aria-label={IS_UUID ? 'Total contributors pending' : `Total contributors: ${registryStats.total}`}>
               <span class="rp-stat-key">TOTAL CONTRIBUTORS</span>
-              <span class="rp-stat-val">{registryStats.total}</span>
+              <span class="rp-stat-val" id="rs-total">{IS_UUID ? '—' : registryStats.total}</span>
             </div>
-            <div class="rp-stat-row" aria-label={`Total decisions: ${registryStats.totalDecisions}`}>
+            <div class="rp-stat-row" aria-label={IS_UUID ? 'Total decisions pending' : `Total decisions: ${registryStats.totalDecisions}`}>
               <span class="rp-stat-key">TOTAL DECISIONS</span>
-              <span class="rp-stat-val">{registryStats.totalDecisions.toLocaleString()}</span>
+              <span class="rp-stat-val" id="rs-decisions">{IS_UUID ? '—' : registryStats.totalDecisions.toLocaleString()}</span>
             </div>
-            <div class="rp-stat-row" aria-label={`Participation: ${registryStats.participation}%`}>
+            <div class="rp-stat-row" aria-label={IS_UUID ? 'Participation pending' : `Participation: ${registryStats.participation}%`}>
               <span class="rp-stat-key">PARTICIPATION %</span>
-              <span class="rp-stat-val">{registryStats.participation}%</span>
+              <span class="rp-stat-val" id="rs-participation">{IS_UUID ? '—' : registryStats.participation}%</span>
             </div>
-            <div class="rp-stat-row" aria-label={`Average influence: ${registryStats.avgInfluence}%`}>
+            <div class="rp-stat-row" aria-label={IS_UUID ? 'Average influence pending' : `Average influence: ${registryStats.avgInfluence}%`}>
               <span class="rp-stat-key">AVG INFLUENCE</span>
-              <span class="rp-stat-val">{registryStats.avgInfluence}%</span>
+              <span class="rp-stat-val" id="rs-influence">{IS_UUID ? '—' : registryStats.avgInfluence}%</span>
             </div>
           </div>
 
@@ -790,15 +806,19 @@ const initials = (h: string) =>
               <span class="rp-label-dot" aria-hidden="true"></span>
               INFLUENCE_HIST
             </div>
-            {contributors.map((c) => (
-              <div class="inf-bar-row" aria-label={`${c.handle}: ${c.influence}%`}>
-                <span class="inf-bar-handle">{c.handle.replace('_',' ').toUpperCase().slice(0,10)}</span>
-                <div class="inf-bar-track" aria-hidden="true">
-                  <div class="inf-bar-fill" style={`width:${Math.round(c.influence / maxInfluence * 100)}%`}></div>
+            {IS_UUID ? (
+              <div class="contrib-loading">SYNCING_INFLUENCE_HIST…</div>
+            ) : (
+              contributors.map((c) => (
+                <div class="inf-bar-row" aria-label={`${c.handle}: ${c.influence}%`}>
+                  <span class="inf-bar-handle">{c.handle.replace('_',' ').toUpperCase().slice(0,10)}</span>
+                  <div class="inf-bar-track" aria-hidden="true">
+                    <div class="inf-bar-fill" style={`width:${Math.round(c.influence / maxInfluence * 100)}%`}></div>
+                  </div>
+                  <span class="inf-bar-pct">{c.influence}%</span>
                 </div>
-                <span class="inf-bar-pct">{c.influence}%</span>
-              </div>
-            ))}
+              ))
+            )}
           </div>
 
           <!-- Pattern breakdown -->
@@ -807,13 +827,17 @@ const initials = (h: string) =>
               <span class="rp-label-dot" aria-hidden="true"></span>
               PATTERN_BREAKDOWN
             </div>
-            {contributors.map((c) => (
-              <div class="pattern-row" aria-label={`${c.pattern}: ${c.handle}`}>
-                <span class="pattern-dot" aria-hidden="true"></span>
-                <span class="pattern-name">{c.pattern.replace(/_/g,' ').toLowerCase()}</span>
-                <span class="pattern-owner">@{c.handle.split('_')[0]}</span>
-              </div>
-            ))}
+            {IS_UUID ? (
+              <div class="contrib-loading">SYNCING_PATTERN_BREAKDOWN…</div>
+            ) : (
+              contributors.map((c) => (
+                <div class="pattern-row" aria-label={`${c.pattern}: ${c.handle}`}>
+                  <span class="pattern-dot" aria-hidden="true"></span>
+                  <span class="pattern-name">{c.pattern.replace(/_/g,' ').toLowerCase()}</span>
+                  <span class="pattern-owner">@{c.handle.split('_')[0]}</span>
+                </div>
+              ))
+            )}
           </div>
 
         </aside>
@@ -972,7 +996,7 @@ const initials = (h: string) =>
           // Influence histogram
           const hist = document.getElementById('influence-hist');
           if (hist) {
-            hist.querySelectorAll('.inf-bar-row').forEach(el => el.remove());
+            hist.querySelectorAll('.inf-bar-row, .contrib-loading').forEach(el => el.remove());
             nodes.forEach(c => {
               const row = document.createElement('div');
               row.className = 'inf-bar-row';
@@ -990,7 +1014,7 @@ const initials = (h: string) =>
           // Pattern breakdown
           const patterns = document.getElementById('pattern-breakdown');
           if (patterns) {
-            patterns.querySelectorAll('.pattern-row').forEach(el => el.remove());
+            patterns.querySelectorAll('.pattern-row, .contrib-loading').forEach(el => el.remove());
             nodes.forEach(c => {
               const row = document.createElement('div');
               row.className = 'pattern-row';

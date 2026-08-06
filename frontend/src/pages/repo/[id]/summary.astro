@@ -5,6 +5,11 @@ export const prerender = false;
 
 const { id } = Astro.params;
 
+// A UUID job id means this is a REAL analysis — the seed narrative only
+// renders for slug/demo URLs; real jobs render honest placeholders that the
+// client fills from GET /api/repo/:id/summary (or a key-required state).
+const IS_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id ?? '');
+
 let repoOwner = 'unknown';
 let repoName  = 'unknown';
 try {
@@ -292,6 +297,13 @@ const stats = { decisions: 12, debates: 7, rejections: 5 };
       border-right:1px solid #1a1a1a;
       overflow-y:auto; padding:0;
     }
+    .narrative-loading {
+      padding: 60px 40px; text-align:center;
+      font-family:'JetBrains Mono',monospace; font-size:0.65rem;
+      letter-spacing:0.1em; color:#a1a1a1;
+      animation: nv-pulse 2s ease-in-out infinite;
+    }
+    @keyframes nv-pulse { 0%,100% { opacity:1; } 50% { opacity:0.4; } }
     #narrative-col::-webkit-scrollbar { width: 4px; }
     #narrative-col::-webkit-scrollbar-track { background: #0e0e0e; }
     #narrative-col::-webkit-scrollbar-thumb { background: #cc0000; }
@@ -648,28 +660,32 @@ const stats = { decisions: 12, debates: 7, rejections: 5 };
 
         <!-- ── NARRATIVE DOCUMENT ─────────────────────── -->
         <article id="narrative-col" aria-label="Intelligence narrative">
-          {sections.map((s, i) => (
-            <>
-              <div class="narrative-section" id={`section-${s.key}`}>
-                <div class="section-header" aria-label={`Section ${s.num}: ${s.label}`}>
-                  <span class="section-num">{s.num}</span>
-                  <span class="section-label">{s.label}</span>
+          {IS_UUID ? (
+            <div class="narrative-loading">SYNCING_NARRATIVE…</div>
+          ) : (
+            sections.map((s, i) => (
+              <>
+                <div class="narrative-section" id={`section-${s.key}`}>
+                  <div class="section-header" aria-label={`Section ${s.num}: ${s.label}`}>
+                    <span class="section-num">{s.num}</span>
+                    <span class="section-label">{s.label}</span>
+                  </div>
+                  {s.body.map((para, pi) => {
+                    // First two words get .lead color
+                    const words   = para.split(' ');
+                    const leadEnd = words.slice(0,2).join(' ');
+                    const rest    = words.slice(2).join(' ');
+                    return (
+                      <p class="section-para">
+                        <span class="lead">{leadEnd} </span>{rest}
+                      </p>
+                    );
+                  })}
                 </div>
-                {s.body.map((para, pi) => {
-                  // First two words get .lead color
-                  const words   = para.split(' ');
-                  const leadEnd = words.slice(0,2).join(' ');
-                  const rest    = words.slice(2).join(' ');
-                  return (
-                    <p class="section-para">
-                      <span class="lead">{leadEnd} </span>{rest}
-                    </p>
-                  );
-                })}
-              </div>
-              {i < sections.length - 1 && <div class="section-sep" aria-hidden="true"></div>}
-            </>
-          ))}
+                {i < sections.length - 1 && <div class="section-sep" aria-hidden="true"></div>}
+              </>
+            ))
+          )}
         </article>
 
         <!-- ── RIGHT CONTROL PANEL ────────────────────── -->
@@ -685,36 +701,38 @@ const stats = { decisions: 12, debates: 7, rejections: 5 };
                 <span class="status-dot dim" aria-hidden="true"></span>
               </div>
             </div>
-            <div class="status-row" aria-label="Integrity: 98.4%">
+            <div class="status-row" aria-label={IS_UUID ? 'Integrity pending' : 'Integrity: 98.4%'}>
               <span class="status-key">INTEGRITY</span>
-              <span class="status-val" id="integrity-val">98.4%</span>
+              <span class="status-val" id="integrity-val">{IS_UUID ? '—' : '98.4%'}</span>
             </div>
             <div class="integrity-bar-wrap" aria-hidden="true">
               <div class="integrity-bar-track">
-                <div class="integrity-bar-fill" style="width:98.4%"></div>
+                <div class="integrity-bar-fill" style={IS_UUID ? 'width:0%' : 'width:98.4%'}></div>
               </div>
             </div>
-            <div class="status-row" aria-label="Confidence: HIGH">
+            <div class="status-row" aria-label={IS_UUID ? 'Confidence pending' : 'Confidence: HIGH'}>
               <span class="status-key">CONFIDENCE</span>
-              <span class="status-val" style="color:#cc0000;">HIGH</span>
+              <span class="status-val" style="color:#cc0000;">{IS_UUID ? '—' : 'HIGH'}</span>
             </div>
           </div>
 
-          <!-- Section index -->
-          <div class="cp-section">
-            <span class="cp-label">SECTION_INDEX</span>
-            {sections.map((s) => (
-              <a
-                href={`#section-${s.key}`}
-                class="index-item"
-                aria-label={`Jump to section ${s.num}: ${s.label}`}
-                onclick={`event.preventDefault(); document.getElementById('section-${s.key}')?.scrollIntoView({behavior:'instant'})`}
-              >
-                <span class="index-num">{s.num}</span>
-                <span class="index-name">{s.label.replace(/_/g,' ')}</span>
-              </a>
-            ))}
-          </div>
+          <!-- Section index (demo sections only) -->
+          {!IS_UUID && (
+            <div class="cp-section">
+              <span class="cp-label">SECTION_INDEX</span>
+              {sections.map((s) => (
+                <a
+                  href={`#section-${s.key}`}
+                  class="index-item"
+                  aria-label={`Jump to section ${s.num}: ${s.label}`}
+                  onclick={`event.preventDefault(); document.getElementById('section-${s.key}')?.scrollIntoView({behavior:'instant'})`}
+                >
+                  <span class="index-num">{s.num}</span>
+                  <span class="index-name">{s.label.replace(/_/g,' ')}</span>
+                </a>
+              ))}
+            </div>
+          )}
 
           <!-- Regenerate + export -->
           <div class="cp-section">
