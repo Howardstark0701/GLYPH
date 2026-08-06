@@ -5,6 +5,28 @@
 **Current Status:** Phases 1–7 complete — rich-ingestion backend, honest frontend data plumbing, Stitch design pass, deployed (Render + Vercel)
 **Last Updated:** August 7, 2026
 
+## Latest Session (2026-08-07) — runtime smoke test + full-stack polish
+
+- 🐛 **Migration fix** — `002_rich_ingestion.sql` used unquoted `user` as a column
+  name (reserved word in PostgreSQL); the schema **failed to apply on any fresh
+  database**. Quoted as `"user"` (INSERTs already quoted it). Verified end-to-end:
+  backend boots against Docker Postgres 16, all migrations apply cleanly.
+- ✅ **Runtime smoke test** — seeded a repo + 4 intent nodes via psql and
+  validated every GET endpoint against the live server:
+  `/status`, `/intent`, `/graph`, `/decisions`, `/rejections`, `/contributors`,
+  `/debates` (200s with correct shapes); `/summary` returns 401 without a NIM key;
+  missing keys → 401; unknown id → 404.
+- ✅ **Contributors page** — now fully re-renders real data (cards, registry
+  stats, influence histogram, pattern breakdown) from `/contributors`. Previously
+  it fetched but never rendered ("full re-render reserved for v2").
+- ✅ **Debates page** — now hydrates thread id/topic/status and agreement/
+  contention metrics from `/debates` instead of leaving static seed text.
+- 🆕 **Report export feature** — dashboard **EXPORT** button downloads a bundled
+  JSON report + Markdown brief (status, narrative, decisions, debates,
+  rejections, contributors, graph). Client-side; BYOK keys never persist.
+- ✅ **Verified** — `cargo test` 11/11 green, `npm run build` clean, all 6 routes
+  render 200 through the dev server. Committed as `157e4ac`.
+
 ## Task Board (last working session)
 
 - ✅ **Task 1 — Backend: rich ingestion** — migration `002_rich_ingestion.sql` (unique constraints, `repos.error_message` + `repos.stage`, PR review/PR comment/issue comment tables); shared `gh_get` helper with 403/429 Retry-After backoff; full PR reviews / PR inline comments / issue comment thread ingestion; `analyze.rs` rewritten with host-validated URL parsing, staged pipeline (`ingesting_commits → … → extracting_intent`), cancel flags.
