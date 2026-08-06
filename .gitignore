@@ -9,6 +9,16 @@ frontend/dist/
 frontend/node_modules/
 backend/target/
 
+# Dev logs — never commit these
+backend/server.log
+backend/server.err
+frontend/dev.log
+frontend/dev_err.log
+frontend/dev_out.log
+
+# Astro dev artifacts
+frontend/.astro/
+
 # Local-only showcase
 SHOWCASE.md
 
