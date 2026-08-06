@@ -38,7 +38,7 @@ pub struct ResponseMessage {
     pub content: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ExtractedInsight {
     pub node_type:    String,
     pub title:        String,

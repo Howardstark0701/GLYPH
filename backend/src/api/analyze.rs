@@ -11,8 +11,7 @@ use uuid::Uuid;
 
 use crate::errors::AppError;
 use crate::ingestion::{commits, issues, pull_requests};
-use crate::intelligence::{client as nim, prompts};
-use crate::processing::linker;
+use crate::intelligence::multipass;
 use crate::AppState;
 
 #[derive(Debug, Deserialize)]
@@ -260,51 +259,45 @@ async fn run_analysis(
         }
     }
 
-    // ── NIM intent extraction ──────────────────────────────────
+    // ── NIM intent extraction (multi-pass + fallback) ──────────
     cancelled(&cancel)?;
     set_stage(db, repo_id, "extracting_intent").await;
 
-    let timeline = linker::build_timeline(repo_id, &all_commits, &all_prs, &all_issues).to_payload();
+    // Window the whole decision history (not just the newest N commits) and
+    // run pass-1 extraction per window; a pass-2 consolidation call merges
+    // cross-window duplicates. If NIM fails, fall back to deterministic
+    // extraction from commit messages + PR state so the job still completes.
+    let chunks = multipass::build_analysis_chunks(
+        owner,
+        repo,
+        &all_commits,
+        &all_prs,
+        &all_issues,
+        &reviews_by_pr,
+        &comments_by_pr,
+        &comments_by_issue,
+    );
 
-    let events_payload = json!({
-        "repository": format!("{}/{}", owner, repo),
-        "timeline": timeline,
-        "commits": all_commits.iter().take(50).map(|c| json!({
-            "sha": &c.sha, "message": &c.commit.message,
-            "author": c.author.as_ref().and_then(|a| a.login.as_deref()).unwrap_or("unknown"),
-            "date": &c.commit.author.date
-        })).collect::<Vec<_>>(),
-        "pull_requests": all_prs.iter().take(30).map(|pr| json!({
-            "number": pr.number, "title": &pr.title,
-            "body": pr.body.as_deref().unwrap_or(""),
-            "state": &pr.state,
-            "author": pr.user.as_ref().map(|u| u.login.as_str()).unwrap_or("unknown"),
-            "created_at": &pr.created_at, "merged_at": &pr.merged_at
-        })).collect::<Vec<_>>(),
-        "pull_request_reviews": reviews_by_pr.iter().flat_map(|(pr, revs)| revs.iter().map(move |r| json!({
-            "pr": pr, "state": &r.state, "body": r.body.as_deref().unwrap_or(""),
-            "author": r.user.as_ref().map(|u| u.login.as_str()).unwrap_or("unknown"),
-            "submitted_at": &r.submitted_at
-        }))).take(120).collect::<Vec<_>>(),
-        "pull_request_comments": comments_by_pr.iter().flat_map(|(pr, cs)| cs.iter().map(move |c| json!({
-            "pr": pr, "path": &c.path, "body": &c.body,
-            "author": c.user.as_ref().map(|u| u.login.as_str()).unwrap_or("unknown")
-        }))).take(120).collect::<Vec<_>>(),
-        "issues": all_issues.iter().take(30).map(|i| json!({
-            "number": i.number, "title": &i.title,
-            "body": i.body.as_deref().unwrap_or(""),
-            "state": &i.state,
-            "author": i.user.as_ref().map(|u| u.login.as_str()).unwrap_or("unknown"),
-            "created_at": &i.created_at
-        })).collect::<Vec<_>>(),
-        "issue_comments": comments_by_issue.iter().flat_map(|(num, cs)| cs.iter().map(move |c| json!({
-            "issue": num, "body": &c.body,
-            "author": c.user.as_ref().map(|u| u.login.as_str()).unwrap_or("unknown")
-        }))).take(120).collect::<Vec<_>>()
-    });
+    let mut insights = match multipass::analyze_events_multipass(
+        &state.http_client,
+        nim_api_key,
+        &chunks,
+    )
+    .await
+    {
+        Ok(i) => i,
+        Err(e) => {
+            tracing::warn!("NIM multi-pass extraction failed: {} — using deterministic fallback", e);
+            multipass::fallback_insights(&all_commits, &all_prs)
+        }
+    };
 
-    let prompt   = prompts::build_analysis_prompt(&events_payload.to_string());
-    let insights = nim::analyze_events_with_prompt(&state.http_client, nim_api_key, &prompt).await?;
+    // Final safety net — never complete an analysis with zero intent nodes.
+    if insights.is_empty() {
+        tracing::warn!("Extraction produced no insights — using deterministic fallback");
+        insights = multipass::fallback_insights(&all_commits, &all_prs);
+    }
+    tracing::info!("Intent extraction complete: {} insight nodes", insights.len());
 
     for insight in &insights {
         sqlx::query(

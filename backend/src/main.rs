@@ -2,7 +2,6 @@ mod api;
 mod errors;
 mod ingestion;
 mod intelligence;
-mod processing;
 
 use axum::{http::HeaderValue, routing::get, Router};
 use std::collections::HashMap;
