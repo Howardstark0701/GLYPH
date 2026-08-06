@@ -17,13 +17,6 @@ import '../styles/global.css';
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
     /* ── Base ─────────────────────────────────────────────── */
-    *, *::before, *::after {
-      box-sizing: border-box;
-      border-radius: 0 !important;
-      box-shadow: none !important;
-      text-shadow: none !important;
-    }
-
     html, body {
       margin: 0;
       padding: 0;
@@ -35,13 +28,7 @@ import '../styles/global.css';
       overflow-y: auto;
     }
 
-    /* ── Typography helpers ───────────────────────────────── */
-    .font-mono  { font-family: 'JetBrains Mono', monospace; }
-    .font-display { font-family: 'Space Grotesk', sans-serif; }
-    .data-sm    { font-family: 'JetBrains Mono', monospace; font-size: 0.6875rem; line-height: 1rem; }
-    .label-caps { font-family: 'JetBrains Mono', monospace; font-size: 0.6875rem; letter-spacing: 0.1em; text-transform: uppercase; line-height: 1rem; }
-
-    /* ── Color tokens ─────────────────────────────────────── */
+    /* ── Color tokens (local mirrors of global.css) ───────── */
     .bg-os      { background: #131313; }
     .border-os  { border-color: #262626; }
     .text-muted { color: #a1a1a1; }
@@ -163,7 +150,24 @@ import '../styles/global.css';
       padding-bottom: 48px;
       width: 100%;
       overflow: visible;
+      position: relative;
     }
+
+    /* ambient red glow bleeding up from behind the title */
+    #hero::before {
+      content: '';
+      position: absolute;
+      top: -40px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 720px;
+      height: 420px;
+      background:
+        radial-gradient(ellipse at 50% 30%, rgba(204, 0, 0, 0.14) 0%, rgba(204, 0, 0, 0.05) 45%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    #hero > * { position: relative; z-index: 1; }
 
     .hero-title {
       font-family: 'Space Grotesk', sans-serif;
@@ -233,6 +237,16 @@ import '../styles/global.css';
       max-width: 640px;
       margin-top: 32px;
       border: 1px solid #cc0000;
+      transition: box-shadow var(--med, 220ms) cubic-bezier(0.2, 0.6, 0.2, 1),
+                  border-color var(--med, 220ms) cubic-bezier(0.2, 0.6, 0.2, 1);
+    }
+    #input-row:focus-within {
+      border-color: #ffb4a8;
+      box-shadow: 0 0 0 1px rgba(255, 180, 168, 0.15),
+                  0 0 24px rgba(204, 0, 0, 0.18);
+    }
+    #input-row:hover:not(:focus-within) {
+      border-color: #ff0000;
     }
 
     #input-label {
@@ -1025,6 +1039,8 @@ import '../styles/global.css';
     // ── Syslog live append ────────────────────────────────
     (function initSyslog() {
       const body = document.getElementById('syslog-body')!;
+      // Boot/system events only — this terminal makes no analysis claims
+      // until a real job is submitted; that work lives in /repo/:id.
       const events: string[] = [
         'SCANNING_PORTS...',
         'SSL_HANDSHAKE_INITIALIZING',
@@ -1034,12 +1050,12 @@ import '../styles/global.css';
         'SECURITY_BYPASS_ATTEMPT_NULLIFIED',
         'SYNCING_LOCAL_CLOCK...',
         'HEARTBEAT_STABLE',
-        'REPO_SCAN_INIT',
-        'NIM_HANDSHAKE',
-        'GRAPH_BUILD',
-        'INTENT_EXTRACT',
-        'CACHE_WRITE',
-        'SIGNAL_READY',
+        'KERNEL_MODULES_LOADED',
+        'GPU_DMA_POOL_LINKED',
+        'IO_QUEUES_READY',
+        'MEMORY_MAP_OK',
+        'THERMAL_NOMINAL',
+        'UPLINK_LOCKED',
       ];
       let idx = 0;
       const startMs = Date.now();

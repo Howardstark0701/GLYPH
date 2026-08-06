@@ -4,54 +4,183 @@
 @tailwind components;
 @tailwind utilities;
 
-*, *::before, *::after {
-  border-radius: 0 !important;
-  box-shadow: none !important;
-  text-shadow: none !important;
+/* ════════════════════════════════════════════════════════════
+   GLYPH OS — design system
+   Dark terminal war-room. Brutalist chrome, hairline borders,
+   surgical red + salmon signal. Craft lives in restraint:
+   every element earns its border; nothing floats without a grid.
+   ════════════════════════════════════════════════════════════ */
+
+/* ── Tokens ────────────────────────────────────────────────── */
+:root {
+  /* surfaces */
+  --bg:        #131313;
+  --bg-inset:  #0e0e0e;
+  --bg-raised: #1a1a1a;
+  /* borders */
+  --border:       #262626;
+  --border-soft:  #1f1f1f;
+  --border-strong: #3a3a3a;
+  /* text */
+  --text:      #e5e2e1;
+  --text-muted:#a1a1a1;
+  --text-faint:#5e3f3a;
+  /* signal */
+  --red:       #cc0000;
+  --red-bright:#ff0000;
+  --salmon:    #ffb4a8;
+  /* node-type accents (graph) */
+  --accent-decision: #22d3ee;
+  --accent-debate:   #f59e0b;
+  --accent-rejection:#ef4444;
+  --accent-arch:     #a78bfa;
+  /* typography */
+  --font-mono:    'JetBrains Mono', monospace;
+  --font-display: 'Space Grotesk', sans-serif;
+  --font-body:    'Karla', sans-serif;
+  /* motion */
+  --ease: cubic-bezier(0.2, 0.6, 0.2, 1);
+  --fast: 120ms;
+  --med:  220ms;
 }
 
-/* Allow animations on specific elements */
-.hero-title,
-.hero-title::before,
-.hero-title::after,
-.data-packet-continuous,
-.byok-dot,
-.byok-path-core,
-.data-packet,
-.node-indicator,
-#scanline-bar,
-.status-dot,
-.s-pulse,
-.log-line,
-.stream-live-sq {
-  animation-duration: unset !important;
-  transition: none !important;
-  filter: unset !important;
+/* ── Base ──────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
-.hero-title {
-  animation-duration: 2s !important;
+html {
+  scrollbar-color: var(--border) var(--bg);
 }
 
-.data-packet-continuous {
-  animation-duration: 4s !important;
-}
-
-html, body {
-  background-color: #131313;
-  color: #e5e2e1;
-  font-family: 'Karla', sans-serif;
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
 }
 
-/* Reset outline on focus to keep border-only focus style */
-*:focus {
-  outline: none;
+/* selection — salmon, not default blue */
+::selection {
+  background: var(--salmon);
+  color: var(--bg);
 }
 
-/* Scrollbar */
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: #131313; }
-::-webkit-scrollbar-thumb { background: #262626; }
+/* focus — keyboard-visible, terminal-styled */
+:focus-visible {
+  outline: 1px solid var(--salmon);
+  outline-offset: 2px;
+}
+
+/* scrollbars — hairline, red thumb on hover */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--bg-inset); }
+::-webkit-scrollbar-thumb { background: var(--border); }
+::-webkit-scrollbar-thumb:hover { background: var(--red); }
+
+/* respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Type helpers ──────────────────────────────────────────── */
+.mono        { font-family: var(--font-mono); }
+.display     { font-family: var(--font-display); }
+.data-sm     { font-family: var(--font-mono); font-size: 0.6875rem; line-height: 1rem; }
+.label-caps  { font-family: var(--font-mono); font-size: 0.625rem; letter-spacing: 0.12em; text-transform: uppercase; line-height: 1rem; }
+
+/* ── Color tokens as classes ───────────────────────────────── */
+.bg-os       { background: var(--bg); }
+.border-os   { border-color: var(--border); }
+.text-muted  { color: var(--text-muted); }
+.text-em     { color: var(--text); }
+.text-red    { color: var(--red); }
+.text-salmon { color: var(--salmon); }
+.text-faint  { color: var(--text-faint); }
+.border-red  { border-color: var(--red); }
+
+/* ── Shared chrome ─────────────────────────────────────────── */
+.hairline {
+  border: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.panel {
+  border: 1px solid var(--border);
+  background: var(--bg-inset);
+}
+
+.hairline-bottom { border-bottom: 1px solid var(--border); }
+.hairline-top    { border-top: 1px solid var(--border); }
+
+/* icon + text utility button — the shared vocabulary all views use */
+.util-btn,
+.nav-icon-btn,
+.icon-btn {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  padding: 5px 6px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: border-color var(--fast) var(--ease),
+              color var(--fast) var(--ease),
+              background-color var(--fast) var(--ease);
+}
+.util-btn:hover,
+.nav-icon-btn:hover,
+.icon-btn:hover {
+  border-color: var(--red);
+  color: var(--red);
+}
+
+/* terminal status dot */
+.status-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--red);
+  flex-shrink: 0;
+}
+.status-dot.live {
+  animation: status-blink 2s var(--ease) infinite;
+}
+@keyframes status-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+/* page titles — Space Grotesk display */
+.page-title {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.9rem;
+  color: var(--salmon);
+  line-height: 1;
+  letter-spacing: -0.01em;
+  margin: 0 0 8px;
+}
+.page-desc {
+  font-family: var(--font-body);
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  margin: 0;
+  max-width: 680px;
+}

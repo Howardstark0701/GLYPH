@@ -96,12 +96,15 @@ const stats = { decisions: 12, debates: 7, rejections: 5 };
     /* ── Reset ───────────────────────────────────────────── */
     *, *::before, *::after {
       box-sizing: border-box;
-      border-radius: 0 !important;
-      box-shadow: none !important;
-      text-shadow: none !important;
-      transition: none !important;
-      outline: none;
     }
+    /* interactive elements animate on the shared easing */
+    a, button, [role="button"], input, select, textarea {
+      transition: border-color 120ms cubic-bezier(0.2,0.6,0.2,1),
+                  color 120ms cubic-bezier(0.2,0.6,0.2,1),
+                  background-color 120ms cubic-bezier(0.2,0.6,0.2,1);
+    }
+    ::selection { background: #ffb4a8; color: #131313; }
+    :focus-visible { outline: 1px solid #ffb4a8; outline-offset: 2px; }
     html, body {
       margin: 0; padding: 0;
       background: #131313;
@@ -770,7 +773,8 @@ const stats = { decisions: 12, debates: 7, rejections: 5 };
        SCRIPTS
   ═════════════════════════════════════════════════════════ -->
   <script define:vars={{ seedSections: sections, repoStats: stats }}>
-    const API_BASE = (window as any).__GLYPH_API__ ?? (import.meta as any).env?.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed } from '../../../scripts/repo-view';
+    const API_BASE = apiBase();
 
     // ── Timestamp watermark ───────────────────────────────
     (function initTimestamp() {
@@ -791,6 +795,12 @@ const stats = { decisions: 12, debates: 7, rejections: 5 };
     (function initGenLog() {
       const body = document.getElementById('gen-log-body');
       if (!body) return;
+
+      // Real jobs stream the actual analysis stage; only demo URLs fabricate.
+      if (getJobId()) {
+        startStatusFeed(body);
+        return;
+      }
 
       const pool = [
         () => `<span class="g-gt">&gt;</span><span class="g-tag-info">[NIM] Prompt tokens: <span class="g-em">${Math.floor(Math.random()*500+2800)}</span> — context window: 128k</span>`,
@@ -819,20 +829,30 @@ const stats = { decisions: 12, debates: 7, rejections: 5 };
 
     // ── Hydrate from real API ─────────────────────────────
     (function hydrateNarrative() {
-      const pathParts = window.location.pathname.split('/').filter(Boolean);
-      const jobId     = pathParts[1] ?? '';
-      const uuidRe    = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!uuidRe.test(jobId)) return;
+      const jobId = getJobId();
+      if (!jobId) return;
 
       const nimKey = sessionStorage.getItem('glyph_nim_key') ?? '';
-      if (!nimKey) return;
+      if (!nimKey) {
+        // Narrative generation is a live NIM call — without the key it
+        // genuinely cannot run, so say so rather than show a stale seed.
+        const col = document.getElementById('narrative-col');
+        showEmptyState(col, 'NIM_KEY_REQUIRED',
+          'Regenerate the narrative after supplying a NIM API key on the landing page.');
+        return;
+      }
 
       fetch(`${API_BASE}/api/repo/${jobId}/summary`, {
         headers: { 'X-Nim-Api-Key': nimKey },
       })
         .then(r => r.ok ? r.json() : null)
         .then(data => {
-          if (!data?.narrative) return;
+          if (!data?.narrative) {
+            const col = document.getElementById('narrative-col');
+            showEmptyState(col, 'NO_NARRATIVE_GENERATED',
+              'This analysis has no narrative yet — regenerate once intent extraction is complete.');
+            return;
+          }
           // Split narrative into paragraphs and distribute into sections
           const paras = data.narrative
             .split(/\n\n+/)
@@ -887,7 +907,10 @@ const stats = { decisions: 12, debates: 7, rejections: 5 };
             if (md) md.textContent = String(data.node_count);
           }
         })
-        .catch(() => {});
+        .catch(() => {
+          const body = document.getElementById('gen-log-body');
+          appendErrorLine(body, 'COULD NOT REACH ANALYSIS SERVICE — showing static preview');
+        });
     })();
 
     // ── Regenerate button ─────────────────────────────────

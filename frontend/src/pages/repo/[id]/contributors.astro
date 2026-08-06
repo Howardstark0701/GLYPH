@@ -128,12 +128,15 @@ const initials = (h: string) =>
     /* ── Reset ───────────────────────────────────────────── */
     *, *::before, *::after {
       box-sizing: border-box;
-      border-radius: 0 !important;
-      box-shadow: none !important;
-      text-shadow: none !important;
-      transition: none !important;
-      outline: none;
     }
+    /* interactive elements animate on the shared easing */
+    a, button, [role="button"], input, select, textarea {
+      transition: border-color 120ms cubic-bezier(0.2,0.6,0.2,1),
+                  color 120ms cubic-bezier(0.2,0.6,0.2,1),
+                  background-color 120ms cubic-bezier(0.2,0.6,0.2,1);
+    }
+    ::selection { background: #ffb4a8; color: #131313; }
+    :focus-visible { outline: 1px solid #ffb4a8; outline-offset: 2px; }
     html, body {
       margin: 0; padding: 0;
       background: #131313;
@@ -851,23 +854,30 @@ const initials = (h: string) =>
        SCRIPTS
   ═════════════════════════════════════════════════════════ -->
   <script define:vars={{ seedContributors: contributors }}>
-    const API_BASE = (window as any).__GLYPH_API__ ?? (import.meta as any).env?.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed } from '../../../scripts/repo-view';
+    const API_BASE = apiBase();
 
     // ── Hydrate from real API ─────────────────────────────
     (function hydrateContributors() {
-      const pathParts = window.location.pathname.split('/').filter(Boolean);
-      const jobId     = pathParts[1] ?? '';
-      const uuidRe    = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!uuidRe.test(jobId)) return;
+      const jobId = getJobId();
+      if (!jobId) return;
 
       fetch(`${API_BASE}/api/repo/${jobId}/contributors`)
         .then(r => r.ok ? r.json() : null)
         .then(data => {
-          if (!data?.contributors?.length) return;
+          if (!data?.contributors?.length) {
+            const feed = document.getElementById('feed-body');
+            showEmptyState(feed, 'NO_CONTRIBUTORS_SIGNALED',
+              'This analysis isolated no authorship patterns for this repository.');
+            return;
+          }
           // Update influence histogram bars with real data
           // (full re-render reserved for v2 — API shapes match seed)
         })
-        .catch(() => {});
+        .catch(() => {
+          const body = document.getElementById('feed-body');
+          appendErrorLine(body, 'COULD NOT REACH ANALYSIS SERVICE — showing static preview');
+        });
     })();
 
     // ── Execute fetch ─────────────────────────────────────
@@ -888,6 +898,12 @@ const initials = (h: string) =>
     (function initFeed() {
       const body = document.getElementById('feed-body');
       if (!body) return;
+
+      // Real jobs stream actual analysis stage; only demo URLs fabricate.
+      if (getJobId()) {
+        startStatusFeed(body);
+        return;
+      }
 
       const cs      = seedContributors;
       const handles = cs.map(c => c.handle);

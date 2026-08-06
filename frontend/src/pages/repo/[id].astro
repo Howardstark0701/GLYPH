@@ -39,11 +39,6 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
     /* ── Reset ────────────────────────────────────────────── */
     *, *::before, *::after {
       box-sizing: border-box;
-      border-radius: 0 !important;
-      box-shadow: none !important;
-      text-shadow: none !important;
-      transition: none !important;
-      outline: none;
     }
     html, body {
       margin: 0; padding: 0;
@@ -53,6 +48,14 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
       height: 100%;
       overflow: hidden; /* dashboard is fixed-layout */
     }
+    /* interactive elements animate on the shared easing */
+    a, button, [role="button"], input, select, textarea {
+      transition: border-color 120ms cubic-bezier(0.2,0.6,0.2,1),
+                  color 120ms cubic-bezier(0.2,0.6,0.2,1),
+                  background-color 120ms cubic-bezier(0.2,0.6,0.2,1);
+    }
+    ::selection { background: #ffb4a8; color: #131313; }
+    :focus-visible { outline: 1px solid #ffb4a8; outline-offset: 2px; }
 
     /* ── Type helpers ─────────────────────────────────────── */
     .mono       { font-family: 'JetBrains Mono', monospace; }
@@ -77,30 +80,19 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
       background: #131313;
       border-bottom: 1px solid #262626;
       display: grid;
-      /* left-meta | glyph-title | search | right-actions */
-      grid-template-columns: 220px 1fr 280px auto;
+      /* glyph-title | search | right-actions */
+      grid-template-columns: auto 1fr auto;
       align-items: center;
       padding: 0 16px 0 0;
       z-index: 200;
     }
 
-    /* Left meta block */
-    #nav-meta {
+    /* GLYPH brand — left edge */
+    #nav-brand {
       padding: 0 16px;
       display: flex;
-      flex-direction: column;
-      justify-content: center;
-      border-right: 1px solid #262626;
-      height: 100%;
-    }
-    #nav-meta .protocol { font-family:'JetBrains Mono',monospace; font-size:0.6rem; letter-spacing:0.14em; text-transform:uppercase; color:#a1a1a1; }
-    #nav-meta .coord    { font-family:'JetBrains Mono',monospace; font-size:0.6rem; letter-spacing:0.06em; color:#5e3f3a; margin-top:2px; }
-
-    /* GLYPH headline — center-left of remaining space */
-    #nav-brand {
-      padding: 0 20px;
-      display: flex;
       align-items: center;
+      height: 100%;
     }
     #nav-brand a {
       font-family: 'Space Grotesk', sans-serif;
@@ -153,21 +145,20 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
     .nav-icon-btn:hover { border-color: #cc0000; color: #cc0000; }
 
     /* ══════════════════════════════════════════════════════
-       LAYOUT  — sidebar + main, below navbar
+       LAYOUT  — sidebar + main + stream, below navbar
     ══════════════════════════════════════════════════════ */
     #layout {
       position: fixed;
       top: 48px;
       left: 0; right: 0; bottom: 0;
-      display: flex;
+      display: grid;
+      grid-template-columns: 172px 1fr 260px;
     }
 
     /* ══════════════════════════════════════════════════════
-       LEFT SIDEBAR  — 160px
+       LEFT SIDEBAR  — 172px
     ══════════════════════════════════════════════════════ */
     #sidebar {
-      width: 160px;
-      flex-shrink: 0;
       background: #131313;
       border-right: 1px solid #262626;
       display: flex;
@@ -194,13 +185,14 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
       color: #a1a1a1;
       cursor: pointer;
       user-select: none;
-      border: none;
+      text-decoration: none;
       background: transparent;
       width: 100%;
       text-align: left;
+      border-left: 2px solid transparent;
     }
     .nav-item:hover:not(.active) { color: #e5e2e1; background: #1a1a1a; }
-    .nav-item.active { background: #cc0000; color: #ffffff; }
+    .nav-item.active { border-left-color: #cc0000; color: #ffffff; background: transparent; }
     .nav-item svg { flex-shrink: 0; }
 
     .sidebar-footer {
@@ -304,7 +296,7 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
       flex: 1;
       display: grid;
       grid-template-columns: 1fr 240px;
-      grid-template-rows: 1fr 220px;
+      grid-template-rows: 1fr;
       gap: 0;
       overflow: hidden;
       min-height: 0;
@@ -340,6 +332,10 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
       flex: 1;
       position: relative;
       overflow: hidden;
+      /* tactical-map framing: hairline inset frame + faint grid */
+      box-shadow: inset 0 0 0 1px rgba(38, 38, 38, 0.5);
+      background-image: radial-gradient(rgba(38, 38, 38, 0.35) 1px, transparent 1px);
+      background-size: 18px 18px;
     }
     #graph-svg { width: 100%; height: 100%; display: block; }
 
@@ -475,16 +471,15 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
     #override-btn:hover { background: #ff0000; }
 
     /* ══════════════════════════════════════════════════════
-       LIVE STREAM PANEL  — bottom full-width
+       LIVE STREAM PANEL  — right column 260px
     ══════════════════════════════════════════════════════ */
     #stream-panel {
-      grid-column: 1 / 3;
-      grid-row: 2;
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      background: #0e0e0e;
-      border-top: 1px solid #262626;
+      background: #111113;
+      border-left: 1px solid #262626;
+      height: calc(100vh - 48px);
     }
     #stream-header {
       display: flex;
@@ -510,6 +505,11 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
       height: 7px;
       background: #cc0000;
       flex-shrink: 0;
+      animation: stream-live-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes stream-live-pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.25; }
     }
     .stream-header-right {
       font-family: 'JetBrains Mono', monospace;
@@ -534,9 +534,10 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
       letter-spacing: 0.04em;
       white-space: nowrap;
     }
-    .stream-line .ln    { color: #3a3a3a; margin-right: 8px; min-width: 16px; display: inline-block; }
-    .stream-line .ev-tr { color: #a1a1a1; }
-    .stream-line .ev-cr { color: #cc0000; font-weight: 700; }
+    .stream-line .ln       { color: #3a3a3a; margin-right: 8px; min-width: 16px; display: inline-block; }
+    .stream-line .ln-critical { color: #cc0000; font-weight: 700; }
+    .stream-line .ev-tr    { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; line-height: 1.6; letter-spacing: 0.04em; color: #a1a1a1; white-space: nowrap; }
+    .stream-line .ev-cr    { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; line-height: 1.6; letter-spacing: 0.04em; color: #cc0000; font-weight: 700; white-space: nowrap; }
     .stream-line .ev-kw { color: #e5e2e1; }
 
     /* Scrollbar */
@@ -609,6 +610,36 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
     }
     .callout-underline.muted { background: #262626; }
 
+    /* ── Graph state overlay (real status, not fake data) ─── */
+    #graph-state {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      text-align: center;
+      pointer-events: none;
+      z-index: 5;
+    }
+    #graph-state[hidden] { display: none; }
+    .graph-state-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.2em;
+      color: #a1a1a1;
+    }
+    #graph-state[data-tone='error'] .graph-state-code    { color: #cc0000; }
+    #graph-state[data-tone='pending'] .graph-state-code  { color: #ffb4a8; }
+    #graph-state[data-tone='muted'] .graph-state-code    { color: #a1a1a1; }
+    .graph-state-msg {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      color: #3a3a3a;
+      max-width: 72%;
+    }
+
     /* ── Scanline overlay ─────────────────────────────────── */
     #scanline-overlay {
       position: fixed;
@@ -639,12 +670,6 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
        TOP NAVBAR
   ═════════════════════════════════════════════════════════ -->
   <nav id="navbar" aria-label="Dashboard navigation">
-
-    <!-- Left meta -->
-    <div id="nav-meta">
-      <span class="protocol">CHARCOAL_PROTOCOL</span>
-      <span class="coord">COORD: {repoSlug}</span>
-    </div>
 
     <!-- GLYPH brand -->
     <div id="nav-brand">
@@ -706,53 +731,56 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
     <aside id="sidebar" aria-label="Navigation sidebar">
       <nav class="sidebar-nav" aria-label="Analysis sections">
 
-        <button class="nav-item active" data-section="recon" aria-current="page" aria-label="Recon — active">
+        <a class="nav-item active" href={`/repo/${id}`} aria-label="Terminal" aria-current="page">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <rect x="0" y="0" width="10" height="10" stroke="currentColor" stroke-width="1" fill="none"/>
-            <rect x="2" y="2" width="6" height="6" fill="currentColor"/>
+            <path d="M2 3l3 2-3 2" stroke="currentColor" stroke-width="1.2" fill="none"/>
+            <line x1="6" y1="7" x2="8" y2="7" stroke="currentColor" stroke-width="1.2"/>
           </svg>
-          RECON
-        </button>
+          TERMINAL
+        </a>
 
-        <button class="nav-item" data-section="vcs" aria-label="VCS Log">
+        <a class="nav-item" href={`/repo/${id}/decisions`} aria-label="Decisions">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <circle cx="2" cy="2" r="1.5" stroke="currentColor" stroke-width="1"/>
-            <circle cx="2" cy="8" r="1.5" stroke="currentColor" stroke-width="1"/>
-            <circle cx="8" cy="5" r="1.5" stroke="currentColor" stroke-width="1"/>
-            <line x1="2" y1="3.5" x2="2" y2="6.5" stroke="currentColor" stroke-width="1"/>
-            <path d="M 2,6.5 C 2,8 8,8 8,6.5" stroke="currentColor" stroke-width="1" fill="none"/>
+            <path d="M2 5l2 2 4-4" stroke="currentColor" stroke-width="1.2" fill="none"/>
           </svg>
-          VCS_LOG
-        </button>
+          DECISIONS
+        </a>
 
-        <button class="nav-item" data-section="decrypt" aria-label="Decrypt">
+        <a class="nav-item" href={`/repo/${id}/debates`} aria-label="Debates">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <rect x="2" y="4" width="6" height="5" stroke="currentColor" stroke-width="1" fill="none"/>
-            <path d="M 3,4 L 3,3 C 3,1.3 7,1.3 7,3 L 7,4" stroke="currentColor" stroke-width="1" fill="none"/>
+            <rect x="1" y="2" width="5" height="4" stroke="currentColor" stroke-width="1" fill="none"/>
+            <path d="M4 6v1.5l2.5-1.5H9V4H7" stroke="currentColor" stroke-width="1" fill="none"/>
           </svg>
-          DECRYPT
-        </button>
+          DEBATES
+        </a>
 
-        <button class="nav-item" data-section="index" aria-label="Index">
+        <a class="nav-item" href={`/repo/${id}/rejections`} aria-label="Rejections">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <line x1="1" y1="2" x2="9" y2="2" stroke="currentColor" stroke-width="1"/>
-            <line x1="1" y1="5" x2="7" y2="5" stroke="currentColor" stroke-width="1"/>
-            <line x1="1" y1="8" x2="5" y2="8" stroke="currentColor" stroke-width="1"/>
+            <line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" stroke-width="1.2"/>
+            <line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" stroke-width="1.2"/>
           </svg>
-          INDEX
-        </button>
+          REJECTIONS
+        </a>
 
-        <button class="nav-item" data-section="network" aria-label="Network">
+        <a class="nav-item" href={`/repo/${id}/contributors`} aria-label="Contributors">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <rect x="4" y="0" width="2" height="2" fill="currentColor"/>
-            <rect x="0" y="4" width="2" height="2" fill="currentColor"/>
-            <rect x="8" y="4" width="2" height="2" fill="currentColor"/>
-            <line x1="5" y1="2" x2="5" y2="4" stroke="currentColor" stroke-width="1"/>
-            <line x1="2" y1="5" x2="4" y2="5" stroke="currentColor" stroke-width="1"/>
-            <line x1="6" y1="5" x2="8" y2="5" stroke="currentColor" stroke-width="1"/>
+            <circle cx="3.5" cy="3" r="1.5" stroke="currentColor" stroke-width="1"/>
+            <path d="M1 8.5c0-1.5 1-2.5 2.5-2.5s2.5 1 2.5 2.5" stroke="currentColor" stroke-width="1" fill="none"/>
+            <circle cx="7" cy="3" r="1.5" stroke="currentColor" stroke-width="1"/>
+            <path d="M5.5 8.5c0-1.5 1-2.5 2.5-2.5s2.5 1 2.5 2.5" stroke="currentColor" stroke-width="1" fill="none"/>
           </svg>
-          NETWORK
-        </button>
+          CONTRIBUTORS
+        </a>
+
+        <a class="nav-item" href={`/repo/${id}/summary`} aria-label="Summary">
+          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+            <rect x="2" y="1" width="6" height="8" stroke="currentColor" stroke-width="1" fill="none"/>
+            <line x1="3.5" y1="3.5" x2="6.5" y2="3.5" stroke="currentColor" stroke-width="0.8"/>
+            <line x1="3.5" y1="5" x2="7.5" y2="5" stroke="currentColor" stroke-width="0.8"/>
+            <line x1="3.5" y1="6.5" x2="5.5" y2="6.5" stroke="currentColor" stroke-width="0.8"/>
+          </svg>
+          SUMMARY
+        </a>
 
       </nav>
 
@@ -761,7 +789,7 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
           EXECUTE_FETCH
         </button>
         <div class="sidebar-util-row">
-          <button class="util-btn" aria-label="Open system log">
+          <button id="sys-log-btn" class="util-btn" aria-label="Open system log">
             <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
               <rect x="0" y="0" width="8" height="8" stroke="currentColor" stroke-width="1" fill="none"/>
               <line x1="1.5" y1="2.5" x2="6.5" y2="2.5" stroke="currentColor" stroke-width="0.8"/>
@@ -770,7 +798,7 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
             </svg>
             SYS_LOG
           </button>
-          <button class="util-btn" aria-label="Terminate session">
+          <button id="terminate-btn" class="util-btn" aria-label="Terminate session">
             <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
               <line x1="1" y1="1" x2="7" y2="7" stroke="currentColor" stroke-width="1"/>
               <line x1="7" y1="1" x2="1" y2="7" stroke="currentColor" stroke-width="1"/>
@@ -838,6 +866,12 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
               <div class="page-dot" role="button" tabindex="0" aria-label="Layer 2" aria-pressed="false"></div>
               <div class="page-dot" role="button" tabindex="0" aria-label="Layer 3" aria-pressed="false"></div>
             </div>
+
+            <!-- Real status overlay — replaces demo data on failure/empty/pending -->
+            <div id="graph-state" hidden aria-live="polite">
+              <span id="graph-state-code" class="graph-state-code"></span>
+              <span id="graph-state-msg" class="graph-state-msg"></span>
+            </div>
           </div>
         </section>
 
@@ -893,33 +927,33 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
 
         </aside>
 
-        <!-- ── LIVE RECON STREAM ────────────────────────── -->
-        <section id="stream-panel" aria-labelledby="stream-header-label">
-          <div id="stream-header">
-            <div class="stream-header-left" id="stream-header-label">
-              <span class="stream-live-sq" aria-hidden="true"></span>
-              LIVE_RECON_STREAM
-              <span style="color:#5e3f3a;">//</span>
-              STDOUT
-            </div>
-            <span class="stream-header-right">FILTER: ALL_EVENTS</span>
-          </div>
-          <div id="stream-body" role="log" aria-label="Live intelligence stream output" aria-live="polite">
-            <!-- Seed lines — rendered server-side, JS appends more -->
-            <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: Heartbeat confirmed by <span class="ev-kw">CHARCOAL_CORE</span></span></div>
-            <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: GitHub ingestion synchronized @ <span class="ev-kw">400ms</span></span></div>
-            <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: Parity check starting on <span class="ev-kw">repo_main</span></span></div>
-            <div class="stream-line"><span class="ln" style="color:#cc0000;font-weight:700;">1</span><span class="ev-cr">CRITICAL: DEBATE CLUSTER DETECTED IN PR <span class="ev-kw">#442</span></span></div>
-            <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: Analyzing decision chain: <span class="ev-kw">branch_main</span> v <span class="ev-kw">branch_experimental</span></span></div>
-            <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: Extracting contributor reasoning profiles...</span></div>
-            <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: Intent node written — <span class="ev-kw">ARCHITECTURAL_DECISION_007</span></span></div>
-            <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: Rejection record flagged — <span class="ev-kw">ABANDONED_FEATURE_012</span></span></div>
-            <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: Analyzing merge conflict: <span class="ev-kw">branch_main</span> v <span class="ev-kw">branch_dev</span></span></div>
-          </div>
-        </section>
-
       </div><!-- /content-grid -->
     </div><!-- /main-area -->
+
+    <!-- ── LIVE RECON STREAM (right column) ─────────────── -->
+    <section id="stream-panel" aria-labelledby="stream-header-label">
+      <div id="stream-header">
+        <div class="stream-header-left" id="stream-header-label">
+          <span class="stream-live-sq" aria-hidden="true"></span>
+          LIVE_RECON_STREAM
+          <span style="color:#5e3f3a;">//</span>
+          STDOUT
+        </div>
+        <span class="stream-header-right">FILTER: ALL_EVENTS</span>
+      </div>
+      <div id="stream-body" role="log" aria-label="Live intelligence stream output" aria-live="polite">
+        <!-- Seed lines — rendered server-side, JS appends more -->
+        <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: Heartbeat confirmed by <span class="ev-kw">CHARCOAL_CORE</span></span></div>
+        <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: GitHub ingestion synchronized @ <span class="ev-kw">400ms</span></span></div>
+        <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: Parity check starting on <span class="ev-kw">repo_main</span></span></div>
+        <div class="stream-line"><span class="ln" style="color:#cc0000;font-weight:700;">1</span><span class="ev-cr">CRITICAL: DEBATE CLUSTER DETECTED IN PR <span class="ev-kw">#442</span></span></div>
+        <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: Analyzing decision chain: <span class="ev-kw">branch_main</span> v <span class="ev-kw">branch_experimental</span></span></div>
+        <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: Extracting contributor reasoning profiles...</span></div>
+        <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: Intent node written — <span class="ev-kw">ARCHITECTURAL_DECISION_007</span></span></div>
+        <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: Rejection record flagged — <span class="ev-kw">ABANDONED_FEATURE_012</span></span></div>
+        <div class="stream-line"><span class="ln">#</span><span class="ev-tr">TRACE: Analyzing merge conflict: <span class="ev-kw">branch_main</span> v <span class="ev-kw">branch_dev</span></span></div>
+      </div>
+    </section>
   </div><!-- /layout -->
 
   <!-- ════════════════════════════════════════════════════════
@@ -928,164 +962,271 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
   <script>
     // ── Uptime counter ────────────────────────────────────
     (function initUptime() {
-      const el = document.getElementById('uptime-val')!;
-      const hb = document.getElementById('heartbeat-val')!;
-      const t0 = Date.now();
+      var el = document.getElementById('uptime-val');
+      var hb = document.getElementById('heartbeat-val');
+      var t0 = Date.now();
 
-      function pad(n: number, d = 2) { return String(n).padStart(d, '0'); }
+      function pad(n, d) { if (d === undefined) d = 2; return String(n).padStart(d, '0'); }
 
       function tick() {
-        const ms  = Date.now() - t0;
-        const s   = Math.floor(ms / 1000);
-        const m   = Math.floor(s / 60);
-        const h   = Math.floor(m / 60);
-        const d   = Math.floor(h / 24);
-        el.textContent = `${pad(d)}:${pad(h % 24)}:${pad(m % 60)}:${pad(s % 60)}`;
+        var ms  = Date.now() - t0;
+        var s   = Math.floor(ms / 1000);
+        var m   = Math.floor(s / 60);
+        var h   = Math.floor(m / 60);
+        var d   = Math.floor(h / 24);
+        el.textContent = pad(d) + ':' + pad(h % 24) + ':' + pad(m % 60) + ':' + pad(s % 60);
         requestAnimationFrame(tick);
       }
       tick();
 
-      // Heartbeat pulse: flip text every ~2s to simulate
-      let hbToggle = false;
-      setInterval(() => {
-        hbToggle = !hbToggle;
-        hb.textContent = hbToggle ? 'HEARTBEAT_STABLE' : 'HEARTBEAT_OK';
-      }, 2000);
+      // Heartbeat pulse: fake toggle ONLY in demo mode (no real job id).
+      // Real jobs get their status from /status polling — a fake toggler here
+      // would fight the live value and make the heartbeat flicker.
+      var currentId = window.location.pathname.split('/').filter(Boolean).pop() || '';
+      var isRealJob = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(currentId);
+      if (!isRealJob) {
+        var hbToggle = false;
+        setInterval(function () {
+          hbToggle = !hbToggle;
+          hb.textContent = hbToggle ? 'HEARTBEAT_STABLE' : 'HEARTBEAT_OK';
+        }, 2000);
+      }
     })();
 
     // ── Sidebar nav ───────────────────────────────────────
     (function initSidebarNav() {
-      const items = document.querySelectorAll<HTMLButtonElement>('.nav-item');
-      items.forEach(btn => {
-        btn.addEventListener('click', () => {
-          items.forEach(b => { b.classList.remove('active'); b.removeAttribute('aria-current'); });
-          btn.classList.add('active');
-          btn.setAttribute('aria-current', 'page');
-        });
+      const current = window.location.pathname.replace(/\/+$/, '');
+      document.querySelectorAll('.nav-item').forEach(function (a) {
+        var href = a.getAttribute('href');
+        if (href && (current === href || current.startsWith(href + '/'))) {
+          a.classList.add('active');
+          a.setAttribute('aria-current', 'page');
+        }
       });
     })();
 
     // ── Execute fetch ─────────────────────────────────────
     (function initExecuteFetch() {
-      const btn      = document.getElementById('execute-fetch') as HTMLButtonElement;
-      const API_BASE = (import.meta as any).env?.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+      var btn      = document.getElementById('execute-fetch');
+      var API_BASE = (import.meta.env && import.meta.env.PUBLIC_API_BASE_URL) || 'http://localhost:8000';
 
       function getKeys() {
         return {
-          github: sessionStorage.getItem('glyph_gh_token') ?? '',
-          nim:    sessionStorage.getItem('glyph_nim_key')  ?? '',
+          github: sessionStorage.getItem('glyph_gh_token') || '',
+          nim:    sessionStorage.getItem('glyph_nim_key')  || '',
         };
       }
 
-      btn.addEventListener('click', async () => {
-        const { github, nim } = getKeys();
-        if (!github || !nim) {
+      btn.addEventListener('click', async function () {
+        var keys = getKeys();
+        if (!keys.github || !keys.nim) {
           btn.textContent = 'KEYS_MISSING';
-          setTimeout(() => { btn.textContent = 'EXECUTE_FETCH'; }, 2000);
+          setTimeout(function () { btn.textContent = 'EXECUTE_FETCH'; }, 2000);
           return;
         }
 
-        const coordEl  = document.querySelector<HTMLElement>('#page-header-left .page-context');
-        const raw      = coordEl?.textContent ?? '';
-        // Extract slug from "THREAD CONTEXT: OWNER_REPO_ANALYSIS"
-        const slug     = raw.replace('THREAD CONTEXT:', '').replace('_ANALYSIS', '').trim()
+        var coordEl  = document.querySelector('#page-header-left .page-context');
+        var raw      = (coordEl && coordEl.textContent) || '';
+        var slug     = raw.replace('THREAD CONTEXT:', '').replace('_ANALYSIS', '').trim()
                            .replace(/_/g, '/').toLowerCase();
 
         btn.textContent = 'FETCHING...';
         btn.disabled    = true;
 
         try {
-          const resp = await fetch(`${API_BASE}/api/analyze`, {
+          var resp = await fetch(API_BASE + '/api/analyze', {
             method:  'POST',
             headers: {
               'Content-Type':   'application/json',
-              'X-Github-Token': github,
-              'X-Nim-Api-Key':  nim,
+              'X-Github-Token': keys.github,
+              'X-Nim-Api-Key':  keys.nim,
             },
-            body: JSON.stringify({ repo_url: `https://github.com/${slug}` }),
+            body: JSON.stringify({ repo_url: 'https://github.com/' + slug }),
           });
 
-          const data = await resp.json();
-          if (!resp.ok) throw new Error(data.error ?? `HTTP ${resp.status}`);
+          var data = await resp.json();
+          if (!resp.ok) throw new Error(data.error || 'HTTP ' + resp.status);
 
           btn.textContent = 'RUNNING...';
 
-          const pollInterval = setInterval(async () => {
+          var pollInterval = setInterval(async function () {
             try {
-              const sr = await fetch(`${API_BASE}/api/repo/${data.job_id}/status`);
-              const sd = await sr.json();
+              var sr = await fetch(API_BASE + '/api/repo/' + data.job_id + '/status');
+              var sd = await sr.json();
               if (sd.status === 'complete' || sd.status === 'failed') {
                 clearInterval(pollInterval);
                 btn.disabled    = false;
-                btn.textContent = sd.status === 'complete' ? 'COMPLETE ✓' : 'FAILED ✗';
-                setTimeout(() => { btn.textContent = 'EXECUTE_FETCH'; }, 3000);
+                btn.textContent = sd.status === 'complete' ? 'COMPLETE \u2713' : 'FAILED \u2717';
+                setTimeout(function () { btn.textContent = 'EXECUTE_FETCH'; }, 3000);
               }
-            } catch {
+            } catch (_) {
               clearInterval(pollInterval);
               btn.disabled    = false;
               btn.textContent = 'EXECUTE_FETCH';
             }
           }, 4000);
-        } catch (err: any) {
+        } catch (err) {
           btn.disabled    = false;
           btn.textContent = 'ERROR';
-          setTimeout(() => { btn.textContent = 'EXECUTE_FETCH'; }, 2000);
+          setTimeout(function () { btn.textContent = 'EXECUTE_FETCH'; }, 2000);
         }
+      });
+    })();
+
+    // ── SYS_LOG btn ───────────────────────────────────────
+    (function initSysLog() {
+      var btn = document.getElementById('sys-log-btn');
+      var API_BASE = (import.meta.env && import.meta.env.PUBLIC_API_BASE_URL) || 'http://localhost:8000';
+      var pathParts = window.location.pathname.split('/').filter(Boolean);
+      var repoId = pathParts[pathParts.length - 1];
+
+      btn.addEventListener('click', async function () {
+        btn.textContent = 'FETCHING_LOG...';
+        try {
+          var resp = await fetch(API_BASE + '/api/repo/' + repoId + '/status');
+          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+          var data = await resp.json();
+          btn.textContent = (data.status || 'OK').toUpperCase();
+        } catch (err) {
+          btn.textContent = 'LOG_FAIL';
+        }
+        setTimeout(function () { btn.textContent = 'SYS_LOG'; }, 3000);
+      });
+    })();
+
+    // ── TERMINATE btn ─────────────────────────────────────
+    // POST /api/repo/:id/terminate — flips the backend cancel flag; the job
+    // stops at its next checkpoint and records status "terminated".
+    (function initTerminate() {
+      var btn = document.getElementById('terminate-btn');
+      var API_BASE = (import.meta.env && import.meta.env.PUBLIC_API_BASE_URL) || 'http://localhost:8000';
+      var pathParts = window.location.pathname.split('/').filter(Boolean);
+      var repoId = pathParts[pathParts.length - 1];
+
+      btn.addEventListener('click', async function () {
+        btn.textContent = 'TERMINATING...';
+        btn.disabled = true;
+        try {
+          var resp = await fetch(API_BASE + '/api/repo/' + repoId + '/terminate', {
+            method: 'POST',
+          });
+          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+          btn.textContent = 'TERMINATED ✗';
+
+          var hb = document.getElementById('heartbeat-val');
+          if (hb) hb.textContent = 'TERMINATED';
+
+          // Surface the event in the recon stream immediately.
+          if (window.__glyphAppendStream) {
+            window.__glyphAppendStream('critical', 'ANALYSIS TERMINATED BY OPERATOR');
+          }
+        } catch (err) {
+          btn.textContent = 'TERM_FAIL';
+        }
+        btn.disabled = false;
+        setTimeout(function () { btn.textContent = 'TERMINATE'; }, 4000);
       });
     })();
 
     // ── Override btn ──────────────────────────────────────
     (function initOverride() {
-      const btn = document.getElementById('override-btn') as HTMLButtonElement;
-      btn.addEventListener('click', () => {
+      var btn = document.getElementById('override-btn');
+      btn.addEventListener('click', function () {
         btn.textContent = 'OVERRIDE_QUEUED';
-        setTimeout(() => { btn.textContent = 'INITIALIZE_OVERRIDE'; }, 3000);
+        setTimeout(function () { btn.textContent = 'INITIALIZE_OVERRIDE'; }, 3000);
       });
     })();
 
-    // ── Live stream append ────────────────────────────────
+    // ── Live recon stream — real status/stage driven ───────
     (function initStream() {
-      const body = document.getElementById('stream-body')!;
+      var body = document.getElementById('stream-body');
+      var API_BASE = (import.meta.env && import.meta.env.PUBLIC_API_BASE_URL) || 'http://localhost:8000';
+      var pathParts = window.location.pathname.split('/').filter(Boolean);
+      var repoId = pathParts[pathParts.length - 1];
+      var uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-      interface StreamEntry { level: 'trace' | 'critical'; text: string; }
-
-      const pool: StreamEntry[] = [
-        { level: 'trace',    text: 'Commit graph traversal complete — <span class="ev-kw">1,847 nodes</span>' },
-        { level: 'trace',    text: 'NIM API handshake established @ <span class="ev-kw">build.nvidia.com</span>' },
-        { level: 'critical', text: 'DEBATE CLUSTER DETECTED IN PR <span class="ev-kw">#317</span>' },
-        { level: 'trace',    text: 'Intent node written — <span class="ev-kw">ARCHITECTURAL_DECISION_008</span>' },
-        { level: 'trace',    text: 'PR #298 linked to commit <span class="ev-kw">0xa2c4f81</span>' },
-        { level: 'trace',    text: 'Contributor reasoning profile extracted: <span class="ev-kw">@contributor_04</span>' },
-        { level: 'critical', text: 'REJECTION RECORD CONFIRMED — <span class="ev-kw">ABANDONED_FEATURE_019</span>' },
-        { level: 'trace',    text: 'Rate limit headroom: <span class="ev-kw">4,204 / 5,000</span> requests remaining' },
-        { level: 'trace',    text: 'Decision chain resolved: <span class="ev-kw">AUTH_MODULE_V2</span>' },
-        { level: 'trace',    text: 'Repo narrative segment written — <span class="ev-kw">epoch_003</span>' },
-      ];
-      let poolIdx = 0;
-      let criticalCount = 1;
-
-      setInterval(() => {
-        const entry = pool[poolIdx % pool.length];
-        poolIdx++;
-
-        const line = document.createElement('div');
+      // Shared append — also used by the terminate handler.
+      function appendLine(level, text) {
+        var line = document.createElement('div');
         line.className = 'stream-line';
-
-        if (entry.level === 'critical') {
-          criticalCount++;
-          line.innerHTML = `<span class="ln" style="color:#cc0000;font-weight:700;">${criticalCount}</span><span class="ev-cr">CRITICAL: ${entry.text}</span>`;
+        if (level === 'critical') {
+          line.innerHTML = '<span class="ln" style="color:#cc0000;font-weight:700;">!</span><span class="ev-cr">CRITICAL: ' + text + '</span>';
         } else {
-          line.innerHTML = `<span class="ln">#</span><span class="ev-tr">TRACE: ${entry.text}</span>`;
+          line.innerHTML = '<span class="ln">#</span><span class="ev-tr">TRACE: ' + text + '</span>';
         }
-
         body.appendChild(line);
         body.scrollTop = body.scrollHeight;
+        while (body.children.length > 60) body.removeChild(body.firstChild);
+      }
+      window.__glyphAppendStream = appendLine;
 
-        // Cap at 40 lines
-        while (body.children.length > 40) {
-          body.removeChild(body.firstChild!);
+      // Demo mode (no UUID in the URL): leave the server-seeded lines as-is.
+      if (!uuidRe.test(repoId)) return;
+
+      // Real job: drop the canned seed lines — everything below is genuine.
+      body.innerHTML = '';
+
+      var stageLabels = {
+        'queued':                    'Job queued — waiting for scheduler',
+        'ingesting_commits':         'Ingesting commit graph from GitHub API',
+        'ingesting_pull_requests':   'Ingesting pull request history',
+        'ingesting_issues':          'Ingesting issue tracker',
+        'ingesting_review_threads':  'Pulling PR reviews & comment threads (debate evidence)',
+        'extracting_intent':         'Running NIM intent extraction over event timeline',
+        'idle':                      'Analysis complete — idle',
+      };
+
+      var lastStatus = null;
+      var lastStage  = null;
+      var lastNodes  = null;
+
+      async function poll() {
+        try {
+          var resp = await fetch(API_BASE + '/api/repo/' + repoId + '/status');
+          if (!resp.ok) return;
+          var data = await resp.json();
+          var status = data.status || 'unknown';
+          var stage  = data.stage  || '';
+
+          var hb = document.getElementById('heartbeat-val');
+          if (hb) hb.textContent = status.toUpperCase();
+
+          if (status !== lastStatus) {
+            lastStatus = status;
+            if (status === 'complete') {
+              appendLine('trace', 'Analysis complete — intent graph <span class="ev-kw">materialized</span>');
+            } else if (status === 'failed') {
+              appendLine('critical', 'Analysis failed: ' + (data.error_message || 'unknown error'));
+            } else if (status === 'terminated') {
+              appendLine('critical', 'Analysis terminated — partial data preserved');
+            } else if (status === 'processing') {
+              appendLine('trace', 'Analysis session started — job <span class="ev-kw">' + repoId.slice(0, 8) + '</span>');
+            }
+          }
+
+          if (status === 'processing' && stage && stage !== lastStage) {
+            lastStage = stage;
+            appendLine('trace', (stageLabels[stage] || stage.replace(/_/g, ' ')) + ' …');
+          }
+
+          if (status === 'complete') {
+            try {
+              var g  = await fetch(API_BASE + '/api/repo/' + repoId + '/graph');
+              var gd = await g.json();
+              var n  = (gd.meta && gd.meta.total_nodes) || (gd.nodes && gd.nodes.length) || 0;
+              if (n > 0 && n !== lastNodes) {
+                lastNodes = n;
+                appendLine('trace', 'Intent graph holds <span class="ev-kw">' + n + ' nodes</span>');
+              }
+            } catch (_) {}
+          }
+        } catch (_) {
+          // Backend unreachable — stay quiet rather than spam the log.
         }
-      }, 1800);
+      }
+
+      poll();
+      setInterval(poll, 3000);
     })();
   </script>
 
@@ -1098,143 +1239,175 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
     // Extract job_id from the current URL path: /repo/:id
     const pathParts = window.location.pathname.split('/').filter(Boolean);
     const jobId     = pathParts[pathParts.length - 1];
+    const uuidRe    = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-    const svg    = d3.select('#graph-svg');
-    const contEl = document.getElementById('graph-container');
-    if (!contEl) throw new Error('graph-container missing');
+    const svg        = d3.select('#graph-svg');
+    const contEl     = document.getElementById('graph-container');
+    const stateEl    = document.getElementById('graph-state');
+    const stateCode  = document.getElementById('graph-state-code');
+    const stateMsg   = document.getElementById('graph-state-msg');
 
-    const W = contEl.offsetWidth  || 600;
-    const H = contEl.offsetHeight || 340;
+    const W = contEl?.offsetWidth  || 600;
+    const H = contEl?.offsetHeight || 340;
     svg.attr('viewBox', `0 0 ${W} ${H}`);
 
-    // ── Types ─────────────────────────────────────────────
-    interface GNode { id: string; label: string; sha: string; type?: string; x?: number; y?: number; fx?: number | null; fy?: number | null; }
-    interface GLink { source: string | GNode; target: string | GNode; type: 'decision' | 'rejected' | 'debate'; }
+    // ── Real state overlay ────────────────────────────────
+    // Honest rendering: failed/terminated/empty jobs show a labeled state,
+    // never a static demo graph masquerading as analysis output.
+    function setGraphState(code, msg, tone) {
+      if (!stateEl || !stateCode || !stateMsg) return;
+      if (!msg) { stateEl.hidden = true; return; }
+      stateEl.hidden = false;
+      stateEl.setAttribute('data-tone', tone || 'muted');
+      stateCode.textContent = code;
+      stateMsg.textContent  = msg;
+    }
 
-    // ── Fallback static data (shown before API responds) ──
-    const fallbackNodes: GNode[] = [
-      { id: 'n1',  label: 'INIT_REPO',            sha: '0xf3a91c2' },
-      { id: 'n2',  label: 'AUTH_MODULE_V1',        sha: '0x2c4d801' },
-      { id: 'n3',  label: 'AUTH_MODULE_V2',        sha: '0xa9e3f14' },
-      { id: 'n4',  label: 'API_GATEWAY',           sha: '0x7b1c339' },
-      { id: 'n5',  label: 'ABANDONED_FEATURE_012', sha: '0x1d5a0c8' },
-      { id: 'n6',  label: 'DB_SCHEMA_V3',          sha: '0x4f2b17e' },
-      { id: 'n7',  label: 'NIM_PIPELINE',          sha: '0x8e3cc0a' },
-    ];
-    const fallbackLinks: GLink[] = [
-      { source: 'n1', target: 'n2', type: 'decision' },
-      { source: 'n2', target: 'n3', type: 'debate'   },
-      { source: 'n3', target: 'n4', type: 'decision' },
-      { source: 'n2', target: 'n5', type: 'rejected' },
-      { source: 'n4', target: 'n6', type: 'decision' },
-      { source: 'n4', target: 'n7', type: 'decision' },
-    ];
+    // ── Load graph, gated by job status ───────────────────
+    async function loadGraph() {
+      if (!uuidRe.test(jobId)) {
+        return { kind: 'empty', code: 'NO_JOB', msg: 'No analysis session linked to this view.' };
+      }
 
-    // ── Fetch real graph data if job_id looks like a UUID ─
-    async function loadGraph(): Promise<{ nodes: GNode[]; links: GLink[] }> {
-      const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-      if (!uuidRe.test(jobId)) return { nodes: fallbackNodes, links: fallbackLinks };
+      // Consult status first — never paint fake data over a failure.
+      let status = 'processing';
+      let errorMsg = null;
+      try {
+        const s = await fetch(`${API_BASE}/api/repo/${jobId}/status`);
+        if (s.ok) {
+          const sd = await s.json();
+          status   = sd.status ?? 'processing';
+          errorMsg = sd.error_message ?? null;
+        }
+      } catch (_) { /* backend unreachable — attempt graph anyway */ }
+
+      if (status === 'failed') {
+        return { kind: 'error', code: 'ANALYSIS_FAILED', msg: errorMsg || 'The analysis pipeline reported a failure.' };
+      }
+      if (status === 'terminated') {
+        return { kind: 'error', code: 'TERMINATED', msg: errorMsg || 'Analysis was terminated before extraction completed.' };
+      }
 
       try {
         const resp = await fetch(`${API_BASE}/api/repo/${jobId}/graph`);
-        if (!resp.ok) return { nodes: fallbackNodes, links: fallbackLinks };
+        if (!resp.ok) return { kind: 'pending', code: 'LINK_FAIL', msg: 'Graph service unreachable — retrying…' };
         const data = await resp.json();
 
-        if (!data.nodes?.length) return { nodes: fallbackNodes, links: fallbackLinks };
-
-        const nodes: GNode[] = data.nodes.map((n: any) => ({
+        const nodes = (data.nodes ?? []).map((n) => ({
           id:    n.id,
           label: (n.label ?? 'UNKNOWN').toUpperCase().replace(/\s+/g, '_').slice(0, 22),
           sha:   n.sha ?? '0x0000000',
-          type:  n.type,
+          type:  n.type ?? 'unknown',
         }));
-
-        const links: GLink[] = (data.links ?? []).map((l: any) => ({
+        const links = (data.links ?? []).map((l) => ({
           source: l.source,
           target: l.target,
           type:   l.type === 'rejected' ? 'rejected' : l.type === 'debate' ? 'debate' : 'decision',
         }));
 
-        // Update header stats
-        const nodeCountEl = document.getElementById('node-count');
-        const densityEl   = document.getElementById('graph-density');
-        if (nodeCountEl) nodeCountEl.textContent = String(data.meta?.total_nodes ?? nodes.length);
-        if (densityEl)   densityEl.textContent   = String(data.meta?.density_pct ?? 0);
+        const nc = document.getElementById('node-count');
+        const de = document.getElementById('graph-density');
+        if (nc) nc.textContent = String(data.meta?.total_nodes ?? nodes.length);
+        if (de) de.textContent = String(data.meta?.density_pct ?? 0);
 
-        return { nodes, links };
+        if (!nodes.length) {
+          return { kind: 'empty', code: 'NO_INTENT', msg: 'No intent nodes extracted yet — analysis may still be running.' };
+        }
+        return { kind: 'data', nodes, links };
       } catch {
-        return { nodes: fallbackNodes, links: fallbackLinks };
+        return { kind: 'pending', code: 'SYNCING', msg: 'Synchronizing decision graph…' };
       }
     }
 
-    // ── Also poll status and update heartbeat display ─────
+    // ── Poll status → heartbeat display ──────────────────
     async function pollStatus() {
-      const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!uuidRe.test(jobId)) return;
-
       try {
         const resp = await fetch(`${API_BASE}/api/repo/${jobId}/status`);
         if (!resp.ok) return;
         const data = await resp.json();
         const hb   = document.getElementById('heartbeat-val');
         if (hb) hb.textContent = (data.status ?? 'UNKNOWN').toUpperCase();
-      } catch { /* ignore */ }
+      } catch (_) { /* ignore */ }
     }
-
     pollStatus();
     setInterval(pollStatus, 5000);
 
     // ── Render ────────────────────────────────────────────
-    const { nodes, links } = await loadGraph();
+    const result = await loadGraph();
 
-    const NODE_W = 108;
-    const NODE_H = 32;
+    // Drop decorative seed callouts once we know the real state.
+    document.querySelectorAll('.conflict-callout').forEach((el) => { el.style.display = 'none'; });
 
-    const simulation = d3.forceSimulation<GNode>(nodes)
-      .force('link',    d3.forceLink<GNode, GLink>(links).id(d => d.id).distance(120).strength(0.6))
-      .force('charge',  d3.forceManyBody().strength(-320))
-      .force('center',  d3.forceCenter(W / 2, H / 2))
-      .force('x',       d3.forceX(W / 2).strength(0.04))
-      .force('y',       d3.forceY(H / 2).strength(0.04))
-      .force('collide', d3.forceCollide(70));
+    if (result.kind === 'error') {
+      setGraphState(result.code, result.msg, 'error');
+    } else if (result.kind === 'pending') {
+      setGraphState(result.code, result.msg, 'pending');
+    } else if (result.kind === 'empty') {
+      setGraphState(result.code, result.msg, 'muted');
+    } else {
+      setGraphState(null, null);
+      renderGraph(result.nodes, result.links);
+    }
 
-    const linkGroup = svg.append('g');
-    const linkEl = linkGroup.selectAll<SVGLineElement, GLink>('line')
-      .data(links).enter().append('line')
-      .attr('class', (d: GLink) =>
-        d.type === 'decision' ? 'g-link-decision' :
-        d.type === 'rejected' ? 'g-link-rejected' : 'g-link-debate');
+    function renderGraph(nodes, links) {
+      const NODE_W = 108;
+      const NODE_H = 32;
+      const TYPE_COLOR = {
+        decision:      '#22d3ee',
+        debate:        '#f59e0b',
+        rejection:     '#ef4444',
+        architectural: '#a78bfa',
+        unknown:       '#64748b',
+      };
 
-    const nodeGroup = svg.append('g');
-    const nodeEl = nodeGroup.selectAll<SVGGElement, GNode>('g')
-      .data(nodes).enter().append('g').attr('class', 'g-node')
-      .call(
-        d3.drag<SVGGElement, GNode>()
-          .on('start', (ev: any, d: GNode) => { if (!ev.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
-          .on('drag',  (ev: any, d: GNode) => { d.fx = ev.x; d.fy = ev.y; })
-          .on('end',   (ev: any, d: GNode) => { if (!ev.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; })
-      );
+      const simulation = d3.forceSimulation(nodes)
+        .force('link',    d3.forceLink(links).id(d => d.id).distance(120).strength(0.6))
+        .force('charge',  d3.forceManyBody().strength(-320))
+        .force('center',  d3.forceCenter(W / 2, H / 2))
+        .force('x',       d3.forceX(W / 2).strength(0.04))
+        .force('y',       d3.forceY(H / 2).strength(0.04))
+        .force('collide', d3.forceCollide(70));
 
-    nodeEl.append('rect')
-      .attr('x', -NODE_W / 2).attr('y', -NODE_H / 2)
-      .attr('width', NODE_W).attr('height', NODE_H);
+      const linkGroup = svg.append('g');
+      const linkEl = linkGroup.selectAll('line')
+        .data(links).enter().append('line')
+        .attr('class', d =>
+          d.type === 'decision' ? 'g-link-decision' :
+          d.type === 'rejected' ? 'g-link-rejected' : 'g-link-debate');
 
-    nodeEl.append('text').attr('class', 'node-title')
-      .attr('x', -NODE_W / 2 + 6).attr('y', -4)
-      .text((d: GNode) => `DECISION // ${d.label}`);
+      const nodeGroup = svg.append('g');
+      const nodeEl = nodeGroup.selectAll('g')
+        .data(nodes).enter().append('g').attr('class', 'g-node')
+        .call(
+          d3.drag()
+            .on('start', (ev, d) => { if (!ev.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+            .on('drag',  (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
+            .on('end',   (ev, d) => { if (!ev.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; })
+        );
 
-    nodeEl.append('text').attr('class', 'node-sha')
-      .attr('x', -NODE_W / 2 + 6).attr('y', 9)
-      .text((d: GNode) => `COMMIT: ${d.sha}`);
+      nodeEl.append('rect')
+        .attr('x', -NODE_W / 2).attr('y', -NODE_H / 2)
+        .attr('width', NODE_W).attr('height', NODE_H)
+        .attr('stroke', d => TYPE_COLOR[d.type] || TYPE_COLOR.unknown);
 
-    simulation.on('tick', () => {
-      linkEl
-        .attr('x1', (d: GLink) => ((d.source as GNode).x ?? 0))
-        .attr('y1', (d: GLink) => ((d.source as GNode).y ?? 0))
-        .attr('x2', (d: GLink) => ((d.target as GNode).x ?? 0))
-        .attr('y2', (d: GLink) => ((d.target as GNode).y ?? 0));
-      nodeEl.attr('transform', (d: GNode) => `translate(${d.x ?? 0},${d.y ?? 0})`);
-    });
+      nodeEl.append('text').attr('class', 'node-title')
+        .attr('x', -NODE_W / 2 + 6).attr('y', -4)
+        .text(d => `DECISION // ${d.label}`);
+
+      nodeEl.append('text').attr('class', 'node-sha')
+        .attr('x', -NODE_W / 2 + 6).attr('y', 9)
+        .text(d => `COMMIT: ${d.sha}`);
+
+      simulation.on('tick', () => {
+        linkEl
+          .attr('x1', d => (d.source.x ?? 0))
+          .attr('y1', d => (d.source.y ?? 0))
+          .attr('x2', d => (d.target.x ?? 0))
+          .attr('y2', d => (d.target.y ?? 0));
+        nodeEl.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
+      });
+    }
   </script>
 
   <!-- ── Scanline overlay (Stitch UI visual polish) ────────── -->
