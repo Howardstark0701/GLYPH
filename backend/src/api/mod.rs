@@ -1,4 +1,5 @@
 pub mod analyze;
+pub mod rate_limit;
 pub mod repo;
 
 use axum::{routing::{get, post}, Router};

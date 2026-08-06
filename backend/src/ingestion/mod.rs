@@ -9,6 +9,16 @@ use crate::errors::AppError;
 /// Maximum retries on transient GitHub failures (403/429 — secondary rate limits).
 const MAX_RETRIES: u32 = 3;
 
+/// Max pages fetched for top-level list endpoints (issues / pulls), configurable
+/// via MAX_LIST_PAGES (default 10 → 1000 items). Scales with MAX_COMMITS so
+/// large-repo ingestion covers the whole decision history, not just the head.
+pub fn max_list_pages() -> u32 {
+    std::env::var("MAX_LIST_PAGES")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(10)
+}
+
 /// GET a GitHub API URL with the BYOK token attached, retrying with backoff on
 /// 403/429 (rate limiting) and surfacing any HTTP or transport failure as a
 /// 502 `GitHubApiError` — not a generic 500.

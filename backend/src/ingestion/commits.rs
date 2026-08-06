@@ -35,18 +35,28 @@ pub struct FileChange {
     pub changes: Option<i32>,
 }
 
-const MAX_PAGES: u32 = 10; // cap at 1000 commits
-const PER_PAGE:  u32 = 100;
+const PER_PAGE: u32 = 100;
 
-/// Fetch all commits across pages (up to MAX_PAGES × PER_PAGE)
+/// Maximum commits to ingest, configurable via MAX_COMMITS (default 1000).
+/// For very large repos set MAX_COMMITS=10000 — this fetches 100 pages and
+/// relies on the 403/429 retry/backoff in `gh_get` to stay within rate limits.
+fn max_commits() -> u32 {
+    std::env::var("MAX_COMMITS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1000)
+}
+
+/// Fetch commits across pages (up to MAX_COMMITS).
 pub async fn fetch_all_commits(
     client: &reqwest::Client,
     token:  &str,
     owner:  &str,
     repo:   &str,
 ) -> Result<Vec<GitHubCommit>, AppError> {
-    let mut all    = Vec::new();
-    let mut page   = 1u32;
+    let max_pages = (max_commits().max(1) + PER_PAGE - 1) / PER_PAGE;
+    let mut all   = Vec::new();
+    let mut page  = 1u32;
 
     loop {
         let url = format!(
@@ -59,7 +69,7 @@ pub async fn fetch_all_commits(
         let done = batch.len() < PER_PAGE as usize;
         all.extend(batch);
 
-        if done || page >= MAX_PAGES { break; }
+        if done || page >= max_pages { break; }
         page += 1;
     }
 

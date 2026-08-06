@@ -167,7 +167,7 @@ pub async fn get_graph(
             .and_then(|v| v.as_array()).and_then(|a| a.first())
             .and_then(|v| v.as_str())
             .map(|s| format!("0x{}", &s[..s.len().min(7)]))
-            .unwrap_or_else(|| "0x0000000".into())
+            .unwrap_or_else(|| "N/A".into())
     })).collect();
 
     let mut links: Vec<Value> = Vec::new();

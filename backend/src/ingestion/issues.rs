@@ -1,5 +1,5 @@
 use crate::errors::AppError;
-use crate::ingestion::gh_get;
+use crate::ingestion::{gh_get, max_list_pages};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -25,7 +25,6 @@ pub struct Comment {
     pub created_at: String,
 }
 
-const MAX_PAGES: u32 = 10;
 const PER_PAGE:  u32 = 100;
 /// Bounded sweep over a single issue's comment thread.
 const THREAD_PAGES: u32 = 3;
@@ -52,7 +51,7 @@ pub async fn fetch_all_issues(
         let done = batch.len() < PER_PAGE as usize;
         all.extend(batch);
 
-        if done || page >= MAX_PAGES { break; }
+        if done || page >= max_list_pages() { break; }
         page += 1;
     }
 

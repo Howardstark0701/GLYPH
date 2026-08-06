@@ -1,5 +1,5 @@
 use crate::errors::AppError;
-use crate::ingestion::gh_get;
+use crate::ingestion::{gh_get, max_list_pages};
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -38,7 +38,6 @@ pub struct PullRequestComment {
     pub created_at: String,
 }
 
-const MAX_PAGES: u32 = 10;
 const PER_PAGE:  u32 = 100;
 /// Bounded sweep over a single PR/issue's review thread — enough to capture the
 /// real debate without hammering the rate limit on huge PRs.
@@ -65,7 +64,7 @@ pub async fn fetch_all_pull_requests(
         let done = batch.len() < PER_PAGE as usize;
         all.extend(batch);
 
-        if done || page >= MAX_PAGES { break; }
+        if done || page >= max_list_pages() { break; }
         page += 1;
     }
 

@@ -44,6 +44,11 @@ pub async fn analyze_repo(
         .ok_or(AppError::MissingCredentials)?
         .to_string();
 
+    // Defense-in-depth: cap URL length before any further processing.
+    if payload.repo_url.trim().len() > 2048 {
+        return Err(AppError::BadRequest("repo_url is too long".into()));
+    }
+
     let (owner, name) = parse_github_url(&payload.repo_url).ok_or_else(|| {
         AppError::BadRequest(
             "Invalid GitHub URL — expected https://github.com/owner/repo".into(),
