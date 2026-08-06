@@ -115,6 +115,22 @@ import '../styles/global.css';
 
     .icon-btn:hover { border-color: #cc0000; color: #cc0000; }
 
+    #compare-link {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.625rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #a1a1a1;
+      background: transparent;
+      border: 1px solid #262626;
+      padding: 3px 10px;
+      text-decoration: none;
+      height: 24px;
+      display: inline-flex;
+      align-items: center;
+    }
+    #compare-link:hover { border-color: #cc0000; color: #cc0000; }
+
     /* ── Terminate button ─────────────────────────────────── */
     #terminate-btn {
       font-family: 'JetBrains Mono', monospace;
@@ -728,6 +744,7 @@ import '../styles/global.css';
     <!-- Right: clock + icon buttons -->
     <div style="display:flex;align-items:center;gap:12px;">
       <span id="clock" aria-live="polite" aria-label="System clock">00:00:00.00</span>
+      <a href="/compare" id="compare-link" aria-label="Compare two repositories">COMPARE</a>
       <!-- Grid icon -->
       <button class="icon-btn" aria-label="Grid view" title="Grid">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">

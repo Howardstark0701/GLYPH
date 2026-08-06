@@ -1,4 +1,5 @@
 pub mod analyze;
+pub mod compare;
 pub mod rate_limit;
 pub mod repo;
 
@@ -11,6 +12,7 @@ use crate::AppState;
 pub fn routes(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/analyze", post(analyze::analyze_repo))
+        .route("/compare", post(compare::compare_repos))
         .route("/repo/:id/status",       get(repo::get_status))
         .route("/repo/:id/intent",       get(repo::get_intent))
         .route("/repo/:id/debates",      get(repo::get_debates))

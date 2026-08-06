@@ -386,7 +386,7 @@ fn cancelled(flag: &AtomicBool) -> Result<(), AppError> {
 
 /// Strictly github.com URLs, exactly two path segments. Accepts http(s) and a
 /// bare `github.com/...` prefix, plus optional `.git` / trailing slash.
-fn parse_github_url(url: &str) -> Option<(String, String)> {
+pub fn parse_github_url(url: &str) -> Option<(String, String)> {
     let trimmed = url.trim();
     if trimmed.is_empty() {
         return None;
