@@ -18,12 +18,26 @@ export interface RepoStatus {
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+/**
+ * Resolve the backend API base for the running environment:
+ *   1. PUBLIC_API_BASE_URL env override (set it in Vercel if you want to pin it)
+ *   2. window.__GLYPH_API__ (injected at runtime if ever needed)
+ *   3. localhost:8000 when running on a local dev host
+ *   4. the live Render backend as the production default
+ * Without this, the deployed site fell back to http://localhost:8000 and every
+ * API call hit the user's own machine — graphs/SVG never hydrated.
+ */
 export function apiBase(): string {
-  return (
-    (window as any).__GLYPH_API__ ??
-    (import.meta as any).env?.PUBLIC_API_BASE_URL ??
-    'http://localhost:8000'
-  );
+  const env = (import.meta as any).env?.PUBLIC_API_BASE_URL;
+  if (env) return env;
+  if (typeof window !== 'undefined' && (window as any).__GLYPH_API__) {
+    return (window as any).__GLYPH_API__;
+  }
+  if (typeof window !== 'undefined') {
+    const host = (window as any).location?.hostname ?? '';
+    if (host === 'localhost' || host === '127.0.0.1') return 'http://localhost:8000';
+  }
+  return 'https://glyph-api-qh9i.onrender.com';
 }
 
 /** Job id from the URL path (/repo/:id/...), or null for slug/demo URLs. */

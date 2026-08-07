@@ -106,6 +106,28 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
       color: #ffb4a8;
       text-decoration: none;
       letter-spacing: -0.01em;
+      position: relative;
+      display: inline-block;
+      animation: brand-glitch 4s infinite steps(1);
+    }
+    /* RGB-split glitch layers behind the brand — same look as the landing hero */
+    #nav-brand a::before,
+    #nav-brand a::after {
+      content: 'GLYPH';
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      animation: brand-glitch 4s infinite steps(1);
+    }
+    #nav-brand a::before { color: #cc0000; transform: translate(-1px, 0); }
+    #nav-brand a::after  { color: #22d3ee; transform: translate(1px, 0); }
+    @keyframes brand-glitch {
+      0%, 90%, 100% { clip-path: inset(0 0 0 0); transform: translate(0); opacity: 1; }
+      91% { clip-path: inset(20% 0 40% 0); transform: translate(-2px, 1px); opacity: 0.85; }
+      92% { clip-path: inset(0 0 0 0); transform: translate(0); opacity: 1; }
+      95% { clip-path: inset(70% 0 10% 0); transform: translate(2px, -1px); opacity: 0.9; }
+      96% { clip-path: inset(0 0 0 0); transform: translate(0); opacity: 1; }
     }
 
     /* Search */
@@ -1077,7 +1099,7 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
     // ── Execute fetch ─────────────────────────────────────
     (function initExecuteFetch() {
       var btn      = document.getElementById('execute-fetch');
-      var API_BASE = (import.meta.env && import.meta.env.PUBLIC_API_BASE_URL) || 'http://localhost:8000';
+      var API_BASE = (import.meta.env && import.meta.env.PUBLIC_API_BASE_URL) || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:8000' : 'https://glyph-api-qh9i.onrender.com');
 
       function getKeys() {
         return {
@@ -1145,7 +1167,7 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
     // ── SYS_LOG btn ───────────────────────────────────────
     (function initSysLog() {
       var btn = document.getElementById('sys-log-btn');
-      var API_BASE = (import.meta.env && import.meta.env.PUBLIC_API_BASE_URL) || 'http://localhost:8000';
+      var API_BASE = (import.meta.env && import.meta.env.PUBLIC_API_BASE_URL) || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:8000' : 'https://glyph-api-qh9i.onrender.com');
       var pathParts = window.location.pathname.split('/').filter(Boolean);
       var repoId = pathParts[pathParts.length - 1];
 
@@ -1168,7 +1190,7 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
     // stops at its next checkpoint and records status "terminated".
     (function initTerminate() {
       var btn = document.getElementById('terminate-btn');
-      var API_BASE = (import.meta.env && import.meta.env.PUBLIC_API_BASE_URL) || 'http://localhost:8000';
+      var API_BASE = (import.meta.env && import.meta.env.PUBLIC_API_BASE_URL) || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:8000' : 'https://glyph-api-qh9i.onrender.com');
       var pathParts = window.location.pathname.split('/').filter(Boolean);
       var repoId = pathParts[pathParts.length - 1];
 
@@ -1203,7 +1225,7 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
     // the browser beyond the normal per-request BYOK headers.
     (function initExport() {
       var btn = document.getElementById('export-btn');
-      var API_BASE = (import.meta.env && import.meta.env.PUBLIC_API_BASE_URL) || 'http://localhost:8000';
+      var API_BASE = (import.meta.env && import.meta.env.PUBLIC_API_BASE_URL) || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:8000' : 'https://glyph-api-qh9i.onrender.com');
       var pathParts = window.location.pathname.split('/').filter(Boolean);
       var repoId = pathParts[pathParts.length - 1];
       var IS_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -1360,7 +1382,7 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
     // ── Live recon stream — real status/stage driven ───────
     (function initStream() {
       var body = document.getElementById('stream-body');
-      var API_BASE = (import.meta.env && import.meta.env.PUBLIC_API_BASE_URL) || 'http://localhost:8000';
+      var API_BASE = (import.meta.env && import.meta.env.PUBLIC_API_BASE_URL) || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:8000' : 'https://glyph-api-qh9i.onrender.com');
       var pathParts = window.location.pathname.split('/').filter(Boolean);
       var repoId = pathParts[pathParts.length - 1];
       var uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

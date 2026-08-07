@@ -540,6 +540,11 @@ import '../styles/global.css';
       bottom: 44px;
       left: 20px;
       width: 240px;
+      max-width: calc(100vw - 40px); /* never wider than the viewport */
+      max-height: 42vh;              /* bounded even if lines burst in */
+      display: flex;
+      flex-direction: column;
+      box-sizing: border-box;
       background: #0e0e0e;
       border: 1px solid #262626;
       z-index: 50;
@@ -551,6 +556,7 @@ import '../styles/global.css';
       justify-content: space-between;
       padding: 5px 8px;
       border-bottom: 1px solid #262626;
+      flex-shrink: 0;
     }
 
     .syslog-title {
@@ -576,7 +582,7 @@ import '../styles/global.css';
 
     #syslog-body {
       padding: 4px 8px 6px;
-      overflow: hidden;
+      overflow-y: auto;  /* scroll instead of letting the window blow out */
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.5625rem;
       color: #ae8882;
@@ -968,7 +974,11 @@ import '../styles/global.css';
   ════════════════════════════════════════════════════════════ -->
   <script>
     // ── API base URL ──────────────────────────────────────
-    const API_BASE = (import.meta as any).env?.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+    const API_BASE =
+      (import.meta as any).env?.PUBLIC_API_BASE_URL ??
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? 'http://localhost:8000'
+        : 'https://glyph-api-qh9i.onrender.com');
 
     // ── Session key store (memory only, backed by sessionStorage) ─
     const keys = {
@@ -1137,11 +1147,20 @@ import '../styles/global.css';
           // Navigate to dashboard with the job_id
           window.location.href = `/repo/${encodeURIComponent(data.job_id)}`;
         } catch (err: any) {
-          // Show error in syslog
+          // Show error in syslog — textContent only, so an error string
+          // containing HTML can never break the panel's DOM.
           const body = document.getElementById('syslog-body')!;
           const line = document.createElement('div');
           line.className = 'log-line';
-          line.innerHTML = `<span class="ts" style="color:#cc0000;">[ERROR]</span> <span class="ev" style="color:#cc0000;">${err.message}</span>`;
+          const errTag = document.createElement('span');
+          errTag.style.color = '#cc0000';
+          errTag.textContent = '[ERROR]';
+          const errMsg = document.createElement('span');
+          errMsg.style.color = '#cc0000';
+          errMsg.textContent = String(err?.message ?? 'Unknown error');
+          line.appendChild(errTag);
+          line.appendChild(document.createTextNode(' '));
+          line.appendChild(errMsg);
           body.appendChild(line);
           while (body.children.length > 7) body.removeChild(body.firstChild!);
 
