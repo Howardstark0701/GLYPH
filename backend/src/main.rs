@@ -82,22 +82,45 @@ async fn main() {
     });
 
     // CORS ─────────────────────────────────────────────────
-    // Always allow localhost dev; read FRONTEND_URL from env for production
+    // Always allow localhost dev; read the production frontend origin(s) from
+    // env. Accepts a comma-separated list (FRONTEND_URLS) and the legacy
+    // single-origin FRONTEND_URL. If neither is configured, ANY origin is
+    // allowed — safe for GLYPH because it has no cookies/sessions: BYOK keys
+    // travel per-request as headers and are never stored server-side, so a
+    // cross-origin caller gains nothing it couldn't do with its own keys.
     let mut origins: Vec<HeaderValue> = vec![
         "http://localhost:4321".parse::<HeaderValue>().unwrap(),
         "http://localhost:3000".parse::<HeaderValue>().unwrap(),
     ];
-    if let Ok(frontend_url) = std::env::var("FRONTEND_URL") {
-        if let Ok(v) = frontend_url.parse::<HeaderValue>() {
-            origins.push(v);
-            tracing::info!("CORS origin added: {}", frontend_url);
+    let mut configured_origins = 0;
+    for key in ["FRONTEND_URLS", "FRONTEND_URL"] {
+        if let Ok(val) = std::env::var(key) {
+            for entry in val.split(',') {
+                let entry = entry.trim();
+                if entry.is_empty() {
+                    continue;
+                }
+                if let Ok(v) = entry.parse::<HeaderValue>() {
+                    origins.push(v);
+                    configured_origins += 1;
+                    tracing::info!("CORS origin added: {}", entry);
+                }
+            }
         }
     }
 
-    let cors = CorsLayer::new()
-        .allow_origin(origins)
-        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
-        .allow_headers(Any);
+    let cors = if configured_origins == 0 {
+        tracing::warn!("No FRONTEND_URL(S) configured — allowing all origins (BYOK, no cookies)");
+        CorsLayer::new()
+            .allow_origin(Any)
+            .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+            .allow_headers(Any)
+    } else {
+        CorsLayer::new()
+            .allow_origin(origins)
+            .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+            .allow_headers(Any)
+    };
 
     // Router ───────────────────────────────────────────────
     // Health probe + the whole API surface (all routes live in api::routes).
