@@ -105,3 +105,51 @@ pub async fn rate_limit_middleware(
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::{http::Request, routing::get, Router};
+    use tower::ServiceExt;
+
+    /// Regression test for the 500 "Missing request extension" bug: the
+    /// Extension(rate_limiter) layer must be applied AFTER (outside) the
+    /// middleware so the middleware can extract it. If the order is wrong,
+    /// even the first request 500s instead of reaching the handler.
+    #[tokio::test]
+    async fn middleware_resolves_extension_when_layered_last() {
+        let limiter = RateLimiter::new();
+        let app = Router::new()
+            .route("/", get(|| async { "ok" }))
+            .layer(axum::middleware::from_fn(rate_limit_middleware))
+            .layer(Extension(limiter));
+
+        // First request must succeed (not 500 with "Missing request extension").
+        let res = app
+            .clone()
+            .oneshot(Request::builder().uri("/").body(Body::from("")).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(res.status(), StatusCode::OK, "first request must pass the middleware");
+
+        // Burst to the limit → the next request returns 429. The first request
+        // above already consumed 1 of the budget, so LIMIT_PER_MINUTE-1 more
+        // stay within budget and the one after that is rejected.
+        let mut last: StatusCode = StatusCode::OK;
+        for _ in 1..LIMIT_PER_MINUTE {
+            last = app
+                .clone()
+                .oneshot(Request::builder().uri("/").body(Body::from("")).unwrap())
+                .await
+                .unwrap()
+                .status();
+        }
+        assert_eq!(last, StatusCode::OK, "requests up to the limit stay within budget");
+        let over = app
+            .clone()
+            .oneshot(Request::builder().uri("/").body(Body::from("")).unwrap())
+            .await
+            .unwrap();
+        assert_eq!(over.status(), StatusCode::TOO_MANY_REQUESTS, "request past the limit is 429");
+    }
+}

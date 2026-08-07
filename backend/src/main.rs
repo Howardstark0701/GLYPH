@@ -125,11 +125,15 @@ async fn main() {
     // Router ───────────────────────────────────────────────
     // Health probe + the whole API surface (all routes live in api::routes).
     //
-    // Middleware stack on /api (BYOK abuse protection + body hygiene):
-    //   1. RequestBodyLimitLayer  — reject oversized bodies (64 KB cap)
-    //   2. rate_limit_middleware  — fixed-window per-client rate limit → 429
-    //   3. Extension(rate_limiter) — injects the limiter into the middleware
-    // The Extension must sit inside the middleware so it can read it.
+    // Middleware stack on /api (BYOK abuse protection + body hygiene). Axum
+    // layer order matters: `.layer()` wraps, so the LAST layer applied is the
+    // OUTERMOST. The Extension must be applied last so the rate-limit
+    // middleware (which extracts Extension<RateLimiter>) runs *after* the
+    // limiter has been injected — otherwise every /api request 500s with
+    // "Missing request extension".
+    //   1. Extension(rate_limiter)      — injects the limiter (outermost)
+    //   2. rate_limit_middleware        — fixed-window per-client limit → 429
+    //   3. RequestBodyLimitLayer        — reject oversized bodies (64 KB cap)
     let rate_limiter = api::rate_limit::RateLimiter::new();
 
     // Periodic eviction of stale windows so the map can't grow unbounded.
@@ -144,9 +148,9 @@ async fn main() {
     }
 
     let api_router = api::routes(Arc::clone(&state))
-        .layer(Extension(rate_limiter))
         .layer(axum::middleware::from_fn(api::rate_limit::rate_limit_middleware))
-        .layer(RequestBodyLimitLayer::new(1024 * 64));
+        .layer(RequestBodyLimitLayer::new(1024 * 64))
+        .layer(Extension(rate_limiter));
 
     let router = Router::new()
         .route("/health", get(|| async { "OK" }))
