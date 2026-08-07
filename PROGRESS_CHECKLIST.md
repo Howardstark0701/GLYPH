@@ -57,8 +57,8 @@ Everything below is committed and pushed. Verified locally: `cargo check --all-t
 - **Analysis pipeline:** ingest (commits → PRs → issues → review threads) → multi-pass NIM extraction (windowed pass 1 + consolidation pass 2) → deterministic fallback → `intent_nodes` (decision/debate/rejection/architectural).
 
 ## Live URLs
-- Backend: `https://glyph-api-u495.onrender.com` (`/health` probe)
-- Frontend: `https://glyph-pua2jbu7s-glyph-tango.vercel.app`
+- Backend: `https://glyph-api-qh9i.onrender.com` (`/health` probe → `200`)
+- Frontend: `https://glyph-flax-two.vercel.app`
 - Compare: `<frontend>/compare`
 
 ## Known Limitations / Honest Notes
