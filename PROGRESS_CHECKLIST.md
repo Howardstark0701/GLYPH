@@ -198,6 +198,116 @@ was silently producing before:
 deserialization failures above). `cargo build --release` and `npm run build`
 clean.
 
+## Latest session (2026-09-10, later) — live-run verification pass
+
+The local stack was brought up from scratch (`docker compose up --build`) and
+three real repositories were analysed with real credentials. Everything below
+was found by watching the thing actually run, not by reading the source.
+
+### Every decision the model forgot to score read as 0% confidence
+
+`ExtractedInsight.confidence` was `#[serde(default)] f32`, so a missing key
+became `0.0`. On the first `sharkdp/bat` run, **9 of 15 decisions** came back
+at 0.0 — and they were among the best-evidenced findings in the set, with full
+cross-referenced reasoning. The consequences compounded:
+
+- decision cards read `CONFIDENCE: 0%` and took the `CRITICAL` status chip
+- the chronological scatter pinned them to the floor of the y-axis
+- the histogram counted them as `MINIMAL (<50%)`
+- `AVG CONFIDENCE` averaged them in, so the headline number was wrong
+
+`confidence` is now `Option<f32>`. The `intent_nodes.confidence` column was
+already nullable, so NULL flows straight through to the API, and every
+aggregate — the debates mean, the per-contributor mean, `/compare`'s profile —
+averages over *rated* nodes only instead of dividing by every row. The UI
+renders an em-dash and an `UNRATED` chip, leaves unrated decisions off the
+confidence scatter, and states plainly how much of the set the distribution
+covers ("20 of 23 unrated by the model").
+
+### The consolidation pass was throwing the scores away
+
+Worse than the default: the extraction pass *does* score insights, and the
+second consolidation pass silently drops the field while rewriting each
+record. On `BurntSushi/ripgrep`, 20 of 23 consolidated insights came back
+unrated for this reason. Consolidated insights now inherit the extraction
+pass's score by title when the model omits it, the consolidation prompt
+demands the field explicitly, and the log reports how many remain unrated.
+
+### A blank decision card among the real ones
+
+The deliberately tolerant parser admitted an object with no title, no summary,
+no reasoning, no refs and no timestamp — a placeholder the model emitted at
+the end of an array. It rendered as an empty card. Insights with neither a
+title nor any prose are now dropped, and the count is logged.
+
+### Three status pollers that never stopped
+
+Opening any repo page for a job id that does not exist made the page hit
+`/status` every 3 seconds for the life of the tab, silently: the code returned
+early on failure without telling the viewer anything, and never cleared its
+interval. Two such loops ran on the dashboard alone (one of them a duplicate
+that wrote the same heartbeat element as the other), and one on each sub-page.
+At six pages open that is enough traffic to trip the 120/min rate limiter
+against the demo's own backend.
+
+They now stop on a 404, stop after five consecutive unreachable ticks, stop
+once the job reaches a terminal state, and say which of those happened. The
+duplicate poller is gone. The `HEARTBEAT_STABLE` readout — seeded demo copy
+that survived on real jobs — now reads `QUERYING`, then the real status, or
+`NOT_FOUND` / `UNREACHABLE`. Two messages that promised a retry which never
+came ("Graph service unreachable — retrying…") were reworded.
+
+### Every page title read "unknown"
+
+The URL of a real job carries only its UUID, so the six repo pages fell back
+to `unknown/unknown` in their titles and headers — a dashboard that cannot
+name the repository it just analysed reads as broken. `GET /status` now
+returns `owner`, `name` and `github_url`, and the pages hydrate from it.
+
+Two of them were worse: `decisions.astro` and `contributors.astro` wrote
+`{repoOwner}/{repoName}` in the title, and **the Astro compiler swallows a
+`/{expr}` that follows another expression**, so those titles rendered as
+`unknown` with the repository name dropped entirely. Both now build a single
+`repoSlug` expression. Each page publishes what it server-rendered in
+`<meta name="glyph-repo-slug">` so the client replaces exactly that string.
+
+### Smaller fixes
+
+- `ENCRYPTION: AES_256_GCM` on the landing page was an invented cryptographic
+  claim — GLYPH holds nothing at rest and adds no cipher beyond the transport.
+  Replaced with `KEYS: NEVER_STORED`, which is true and is the actual pitch.
+- `WINDOW: 128H` above the debate sentiment spectrum described no real window.
+  It now reports the actual span of the debates plotted.
+- Added a favicon; every page was requesting one and getting a 404.
+
+### Verified end-to-end (real credentials, local stack)
+
+| Repo | Result |
+|---|---|
+| `sharkdp/bat` | 15 decisions, 14/15 timestamped, 9 contributors, ~5m10s |
+| `BurntSushi/ripgrep` | 23 decisions, **23/23 timestamped**, 30 graph nodes, 26 contributors |
+| `sharkdp/hyperfine` | run on the fully fixed backend |
+
+Also exercised directly against the running stack: `/health` (200, 11ms), both
+migrations applied (9 tables), URL validation (foreign host, extra path
+segments and a 2049-character URL all rejected with 400), unknown job id
+(404), and the rate limiter (120 requests pass, the 121st returns 429 with
+`retry-after: 19`).
+
+`cargo test` 25/25 green — 4 new regression tests covering unrated confidence,
+blank-insight rejection, and consolidation inheritance. `cargo check
+--all-targets` and `npm run build` clean.
+
+### Known, not fixed
+
+- `/compare` still reports `avg_confidence: 0` rather than null when a
+  repository has no rated nodes at all. Reachable only when every node in a
+  whole repository is unrated; making it optional ripples into the comparison
+  notes, so it was left alone deliberately.
+- A URL-encoded slash in a slug id (`/repo/facebook%2Freact/...`) returns a
+  500 from Astro's router ("Missing parameter: id"). Demo slugs do not contain
+  slashes, and fixing it means touching routing.
+
 ## Task Board
 
 - ✅ **Task 1 — Verify live deploy works** — migration-fix pushed; Render rebuild triggered; Vercel healthy; end-to-end real analysis requires the user's BYOK keys (not automatable).
@@ -256,4 +366,4 @@ provider with an indefinite free tier. Steps are in
 
 ---
 
-*Last updated 2026-09-10 after the debugging + structural pass.*
+*Last updated 2026-09-10 after the live-run verification pass.*

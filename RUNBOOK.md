@@ -163,6 +163,44 @@ Also avoid running `npm run build` while `npm run dev` is watching: the build
 writes into `.vercel/output`, which the dev server then picks up as a file
 change, and the two chase each other.
 
+### Most decisions show CONFIDENCE: — and an UNRATED chip
+
+This is honest output, not a bug. The model is asked for a `confidence` on
+every insight and frequently does not supply one — the extraction pass usually
+does, and the consolidation pass that merges duplicates routinely drops the
+field while rewriting each record.
+
+GLYPH will not invent a number for those. An unrated decision renders an
+em-dash, takes an `UNRATED` chip, is left off the confidence scatter, and is
+excluded from the averages. The confidence panel says how many of the set it
+covers, e.g. `20 of 23 unrated by the model`.
+
+Consolidated insights inherit the extraction pass's score by title where one
+exists, so this should be a minority of the set. If *everything* comes back
+unrated, the backend log line names it:
+
+```
+NIM consolidation pass: 41 insights -> 23 (23 unrated)
+```
+
+Nothing is wrong with the analysis — the decisions, reasoning, contributors
+and timestamps are all real. Only the self-assessed score is absent.
+
+### A page sits on SYNCING and the log stops
+
+Status polling is bounded on purpose. A page stops polling and says so when:
+
+- the job id does not exist (`Status unavailable — no analysis found for job …`)
+- the backend has not answered five consecutive times (`Backend unreachable —
+  status polling stopped after 5 attempts`)
+- the job reaches a terminal state (complete, idle, failed, terminated)
+
+The heartbeat readout in the page header reflects the same thing: `QUERYING`
+before the first answer, then the real status, or `NOT_FOUND` / `UNREACHABLE`.
+
+If you restart the backend mid-demo, reload the page — polling will have
+stopped by design rather than silently retrying for ever.
+
 ### Rate limits
 
 GitHub allows 5,000 requests/hour on a PAT. Ingesting a large repository with
