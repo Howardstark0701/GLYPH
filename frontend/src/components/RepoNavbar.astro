@@ -1,0 +1,77 @@
+---
+// GLYPH OS — the one top bar for every /repo/:id view.
+//
+// Each of the six repo pages used to ship its own navbar. They disagreed on
+// the brand ("GLYPH" in cyan, "GLYPH" in red, "GLYPH_OS" over
+// "SYSTEM_OPERATOR", "GLYPH" beside a version badge), on the version string
+// itself (contributors said v4.0.1-stable while every other page said
+// v4.0.2), and on what sat beside it, so the header visibly rebuilt itself on
+// every click. This is the single source of truth.
+//
+// The four different search inputs those navbars carried are gone. None of
+// them was wired to anything: typing in one did nothing at all, which is a
+// dead control to hand an audience.
+interface Props {
+  /** Server-rendered repository slug; hydrated with the real one client-side. */
+  repoSlug: string;
+}
+const { repoSlug } = Astro.props;
+---
+
+<nav id="navbar" aria-label="System navigation">
+  <a id="nav-brand" href="/" aria-label="Return to GLYPH home">
+    <span class="brand-name">GLYPH_OS</span>
+    <span class="brand-version">v4.0.2-STABLE</span>
+  </a>
+  <span id="nav-repo" data-repo-slug>{repoSlug}</span>
+</nav>
+
+<style is:global>
+  #navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 48px;
+    background: #131313;
+    border-bottom: 1px solid #262626;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 0 18px;
+    z-index: 60;
+  }
+
+  #nav-brand {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    text-decoration: none;
+  }
+  #nav-brand .brand-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.9rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    color: #cc0000;
+  }
+  #nav-brand .brand-version {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.1em;
+    color: #5e3f3a;
+  }
+  #nav-brand:hover .brand-name { color: #ff0000; }
+
+  #nav-repo {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.62rem;
+    letter-spacing: 0.1em;
+    color: #a1a1a1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 40vw;
+  }
+</style>

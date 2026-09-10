@@ -29,6 +29,9 @@ try {
 
 const repoSlug    = `${repoOwner}/${repoName}`;
 const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
+import RepoNavbar from '../../components/RepoNavbar.astro';
+import RepoSidebar from '../../components/RepoSidebar.astro';
+
 ---
 
 <!DOCTYPE html>
@@ -83,54 +86,6 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
     .c-em     { color: #e5e2e1; }
     .c-hero   { color: #ffb4a8; }
     .c-rust   { color: #5e3f3a; }
-
-    /* ══════════════════════════════════════════════════════
-       TOP NAVBAR  — 48px fixed
-    ══════════════════════════════════════════════════════ */
-    #navbar {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      height: 48px;
-      background: #131313;
-      border-bottom: 1px solid #262626;
-      display: grid;
-      /* glyph-title | search | right-actions */
-      grid-template-columns: auto 1fr auto;
-      align-items: center;
-      padding: 0 16px 0 0;
-      z-index: 200;
-    }
-
-    /* GLYPH brand — left edge */
-    #nav-brand {
-      padding: 0 16px;
-      display: flex;
-      align-items: center;
-      height: 100%;
-    }
-    #nav-brand a {
-      font-family: 'Space Grotesk', sans-serif;
-      font-weight: 700;
-      font-size: 1.25rem;
-      color: #ffb4a8;
-      text-decoration: none;
-      letter-spacing: -0.01em;
-      position: relative;
-      display: inline-block;
-      animation: brand-glitch 4s infinite steps(1);
-    }
-    /* RGB-split glitch layers behind the brand — same look as the landing hero */
-    #nav-brand a::before,
-    #nav-brand a::after {
-      content: 'GLYPH';
-      position: absolute;
-      top: 0;
-      left: 0;
-      pointer-events: none;
-      animation: brand-glitch 4s infinite steps(1);
-    }
-    #nav-brand a::before { color: #cc0000; transform: translate(-1px, 0); }
-    #nav-brand a::after  { color: #22d3ee; transform: translate(1px, 0); }
     @keyframes brand-glitch {
       0%, 90%, 100% { clip-path: inset(0 0 0 0); transform: translate(0); opacity: 1; }
       91% { clip-path: inset(20% 0 40% 0); transform: translate(-2px, 1px); opacity: 0.85; }
@@ -139,26 +94,6 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
       96% { clip-path: inset(0 0 0 0); transform: translate(0); opacity: 1; }
     }
 
-    /* Search */
-    #nav-search {
-      display: flex;
-      align-items: center;
-      border: 1px solid #262626;
-      height: 28px;
-    }
-    #nav-search input {
-      flex: 1;
-      background: #131313;
-      border: none;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.6875rem;
-      color: #e5e2e1;
-      padding: 0 10px;
-      height: 100%;
-      letter-spacing: 0.04em;
-    }
-    #nav-search input::placeholder { color: #3a3a3a; }
-
     /* Right action buttons */
     #nav-actions {
       display: flex;
@@ -166,19 +101,6 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
       gap: 8px;
       padding-left: 16px;
     }
-    .nav-icon-btn {
-      width: 28px;
-      height: 28px;
-      background: transparent;
-      border: 1px solid #262626;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #a1a1a1;
-      padding: 0;
-    }
-    .nav-icon-btn:hover { border-color: #cc0000; color: #cc0000; }
 
     /* ══════════════════════════════════════════════════════
        LAYOUT  — sidebar + main + stream, below navbar
@@ -192,91 +114,6 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
          (backend error messages carry full API URLs). Wider + wrapping. */
       grid-template-columns: 172px minmax(0, 1fr) 320px;
     }
-
-    /* ══════════════════════════════════════════════════════
-       LEFT SIDEBAR  — 172px
-    ══════════════════════════════════════════════════════ */
-    #sidebar {
-      background: #131313;
-      border-right: 1px solid #262626;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    .sidebar-nav {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      padding-top: 8px;
-    }
-
-    .nav-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 8px 14px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.6rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: #a1a1a1;
-      cursor: pointer;
-      user-select: none;
-      text-decoration: none;
-      background: transparent;
-      width: 100%;
-      text-align: left;
-      border-left: 2px solid transparent;
-    }
-    .nav-item:hover:not(.active) { color: #e5e2e1; background: #1a1a1a; }
-    .nav-item.active { border-left-color: #cc0000; color: #ffffff; background: transparent; }
-    .nav-item svg { flex-shrink: 0; }
-
-    .sidebar-footer {
-      border-top: 1px solid #262626;
-      padding: 10px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    #execute-fetch {
-      width: 100%;
-      background: #cc0000;
-      border: none;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.6rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: #ffffff;
-      padding: 8px 0;
-      cursor: pointer;
-      text-align: center;
-    }
-    #execute-fetch:hover { background: #ff0000; }
-
-    .sidebar-util-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-    .util-btn {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      background: transparent;
-      border: 1px solid #262626;
-      color: #a1a1a1;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.55rem;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      padding: 5px 6px;
-      cursor: pointer;
-    }
-    .util-btn:hover { border-color: #cc0000; color: #cc0000; }
 
     /* ══════════════════════════════════════════════════════
        MAIN AREA
@@ -719,58 +556,7 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
   <!-- ════════════════════════════════════════════════════════
        TOP NAVBAR
   ═════════════════════════════════════════════════════════ -->
-  <nav id="navbar" aria-label="Dashboard navigation">
-
-    <!-- GLYPH brand -->
-    <div id="nav-brand">
-      <a href="/" aria-label="Return to GLYPH home">GLYPH</a>
-    </div>
-
-    <!-- Search -->
-    <div id="nav-search" role="search">
-      <input
-        type="search"
-        placeholder="LOCATE_ENTITY..."
-        autocomplete="off"
-        spellcheck="false"
-        aria-label="Locate entity in repository graph"
-      />
-    </div>
-
-    <!-- Right icon buttons -->
-    <div id="nav-actions" aria-label="Dashboard actions">
-      <!-- Contributors -->
-      <button class="nav-icon-btn" aria-label="View contributors" title="Contributors">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-          <circle cx="5" cy="4" r="2" stroke="currentColor" stroke-width="1"/>
-          <circle cx="9" cy="4" r="2" stroke="currentColor" stroke-width="1"/>
-          <path d="M1 11c0-2 1.8-3 4-3s4 1 4 3" stroke="currentColor" stroke-width="1" fill="none"/>
-          <path d="M9 8c1.5 0 3 0.8 3 3" stroke="currentColor" stroke-width="1" fill="none"/>
-        </svg>
-      </button>
-      <!-- Issues -->
-      <button class="nav-icon-btn" aria-label="View issues" title="Issues">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-          <rect x="1" y="1" width="11" height="11" stroke="currentColor" stroke-width="1"/>
-          <line x1="6.5" y1="4" x2="6.5" y2="7" stroke="currentColor" stroke-width="1.2"/>
-          <rect x="6" y="8.5" width="1" height="1" fill="currentColor"/>
-        </svg>
-      </button>
-      <!-- Network -->
-      <button class="nav-icon-btn" aria-label="View network graph" title="Network">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-          <rect x="5.5" y="0.5" width="2" height="2" fill="currentColor"/>
-          <rect x="0.5" y="5.5" width="2" height="2" fill="currentColor"/>
-          <rect x="10.5" y="5.5" width="2" height="2" fill="currentColor"/>
-          <rect x="5.5" y="10.5" width="2" height="2" fill="currentColor"/>
-          <line x1="6.5" y1="2.5" x2="6.5" y2="5.5" stroke="currentColor" stroke-width="1"/>
-          <line x1="2.5" y1="6.5" x2="5.5" y2="6.5" stroke="currentColor" stroke-width="1"/>
-          <line x1="7.5" y1="6.5" x2="10.5" y2="6.5" stroke="currentColor" stroke-width="1"/>
-          <line x1="6.5" y1="7.5" x2="6.5" y2="10.5" stroke="currentColor" stroke-width="1"/>
-        </svg>
-      </button>
-    </div>
-  </nav>
+  <RepoNavbar repoSlug={repoSlug} />
 
   <!-- ════════════════════════════════════════════════════════
        LAYOUT
@@ -778,95 +564,7 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
   <div id="layout">
 
     <!-- ── LEFT SIDEBAR ─────────────────────────────────── -->
-    <aside id="sidebar" aria-label="Navigation sidebar">
-      <nav class="sidebar-nav" aria-label="Analysis sections">
-
-        <a class="nav-item active" href={`/repo/${id}`} aria-label="Terminal" aria-current="page">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <path d="M2 3l3 2-3 2" stroke="currentColor" stroke-width="1.2" fill="none"/>
-            <line x1="6" y1="7" x2="8" y2="7" stroke="currentColor" stroke-width="1.2"/>
-          </svg>
-          TERMINAL
-        </a>
-
-        <a class="nav-item" href={`/repo/${id}/decisions`} aria-label="Decisions">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <path d="M2 5l2 2 4-4" stroke="currentColor" stroke-width="1.2" fill="none"/>
-          </svg>
-          DECISIONS
-        </a>
-
-        <a class="nav-item" href={`/repo/${id}/debates`} aria-label="Debates">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <rect x="1" y="2" width="5" height="4" stroke="currentColor" stroke-width="1" fill="none"/>
-            <path d="M4 6v1.5l2.5-1.5H9V4H7" stroke="currentColor" stroke-width="1" fill="none"/>
-          </svg>
-          DEBATES
-        </a>
-
-        <a class="nav-item" href={`/repo/${id}/rejections`} aria-label="Rejections">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" stroke-width="1.2"/>
-            <line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" stroke-width="1.2"/>
-          </svg>
-          REJECTIONS
-        </a>
-
-        <a class="nav-item" href={`/repo/${id}/contributors`} aria-label="Contributors">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <circle cx="3.5" cy="3" r="1.5" stroke="currentColor" stroke-width="1"/>
-            <path d="M1 8.5c0-1.5 1-2.5 2.5-2.5s2.5 1 2.5 2.5" stroke="currentColor" stroke-width="1" fill="none"/>
-            <circle cx="7" cy="3" r="1.5" stroke="currentColor" stroke-width="1"/>
-            <path d="M5.5 8.5c0-1.5 1-2.5 2.5-2.5s2.5 1 2.5 2.5" stroke="currentColor" stroke-width="1" fill="none"/>
-          </svg>
-          CONTRIBUTORS
-        </a>
-
-        <a class="nav-item" href={`/repo/${id}/summary`} aria-label="Summary">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <rect x="2" y="1" width="6" height="8" stroke="currentColor" stroke-width="1" fill="none"/>
-            <line x1="3.5" y1="3.5" x2="6.5" y2="3.5" stroke="currentColor" stroke-width="0.8"/>
-            <line x1="3.5" y1="5" x2="7.5" y2="5" stroke="currentColor" stroke-width="0.8"/>
-            <line x1="3.5" y1="6.5" x2="5.5" y2="6.5" stroke="currentColor" stroke-width="0.8"/>
-          </svg>
-          SUMMARY
-        </a>
-
-      </nav>
-
-      <div class="sidebar-footer">
-        <button id="execute-fetch" type="button" aria-label="Execute fetch — trigger repository analysis">
-          EXECUTE_FETCH
-        </button>
-        <div class="sidebar-util-row">
-          <button id="sys-log-btn" class="util-btn" aria-label="Open system log">
-            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
-              <rect x="0" y="0" width="8" height="8" stroke="currentColor" stroke-width="1" fill="none"/>
-              <line x1="1.5" y1="2.5" x2="6.5" y2="2.5" stroke="currentColor" stroke-width="0.8"/>
-              <line x1="1.5" y1="4" x2="6.5" y2="4" stroke="currentColor" stroke-width="0.8"/>
-              <line x1="1.5" y1="5.5" x2="4.5" y2="5.5" stroke="currentColor" stroke-width="0.8"/>
-            </svg>
-            SYS_LOG
-          </button>
-          <button id="terminate-btn" class="util-btn" aria-label="Terminate session">
-            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
-              <line x1="1" y1="1" x2="7" y2="7" stroke="currentColor" stroke-width="1"/>
-              <line x1="7" y1="1" x2="1" y2="7" stroke="currentColor" stroke-width="1"/>
-            </svg>
-            TERMINATE
-          </button>
-          <button id="export-btn" class="util-btn" aria-label="Export full analysis report (JSON + Markdown)">
-            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
-              <line x1="4" y1="0" x2="4" y2="5" stroke="currentColor" stroke-width="1"/>
-              <line x1="1.5" y1="3" x2="4" y2="5.5" stroke="currentColor" stroke-width="1"/>
-              <line x1="6.5" y1="3" x2="4" y2="5.5" stroke="currentColor" stroke-width="1"/>
-              <line x1="0" y1="7" x2="8" y2="7" stroke="currentColor" stroke-width="1"/>
-            </svg>
-            EXPORT
-          </button>
-        </div>
-      </div>
-    </aside>
+    <RepoSidebar id={id} active="terminal" />
 
     <!-- ── MAIN AREA ─────────────────────────────────────── -->
     <div id="main-area">
@@ -1131,283 +829,16 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
       });
     })();
 
-    // ── Execute fetch ─────────────────────────────────────
-    (function initExecuteFetch() {
-      var btn      = document.getElementById('execute-fetch');
-      var API_BASE = (import.meta.env && import.meta.env.PUBLIC_API_BASE_URL) || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:8000' : 'https://glyph-api-qh9i.onrender.com');
 
-      function getKeys() {
-        return {
-          github: sessionStorage.getItem('glyph_gh_token') || '',
-          nim:    sessionStorage.getItem('glyph_nim_key')  || '',
-        };
-      }
-
-      btn.addEventListener('click', async function () {
-        var keys = getKeys();
-        if (!keys.github || !keys.nim) {
-          btn.textContent = 'KEYS_MISSING';
-          setTimeout(function () { btn.textContent = 'EXECUTE_FETCH'; }, 2000);
-          return;
-        }
-
-        var coordEl  = document.querySelector('#page-header-left .page-context');
-        var raw      = (coordEl && coordEl.textContent) || '';
-        var slug     = raw.replace('THREAD CONTEXT:', '').replace('_ANALYSIS', '').trim()
-                           .replace(/_/g, '/').toLowerCase();
-
-        btn.textContent = 'FETCHING...';
-        btn.disabled    = true;
-
-        try {
-          var resp = await fetch(API_BASE + '/api/analyze', {
-            method:  'POST',
-            headers: {
-              'Content-Type':   'application/json',
-              'X-Github-Token': keys.github,
-              'X-Nim-Api-Key':  keys.nim,
-            },
-            body: JSON.stringify({ repo_url: 'https://github.com/' + slug }),
-          });
-
-          var data = await resp.json();
-          if (!resp.ok) throw new Error(data.error || 'HTTP ' + resp.status);
-
-          btn.textContent = 'RUNNING...';
-
-          var pollInterval = setInterval(async function () {
-            try {
-              var sr = await fetch(API_BASE + '/api/repo/' + data.job_id + '/status');
-              var sd = await sr.json();
-              if (sd.status === 'complete' || sd.status === 'failed') {
-                clearInterval(pollInterval);
-                btn.disabled    = false;
-                btn.textContent = sd.status === 'complete' ? 'COMPLETE \u2713' : 'FAILED \u2717';
-                setTimeout(function () { btn.textContent = 'EXECUTE_FETCH'; }, 3000);
-              }
-            } catch (_) {
-              clearInterval(pollInterval);
-              btn.disabled    = false;
-              btn.textContent = 'EXECUTE_FETCH';
-            }
-          }, 4000);
-        } catch (err) {
-          btn.disabled    = false;
-          btn.textContent = 'ERROR';
-          setTimeout(function () { btn.textContent = 'EXECUTE_FETCH'; }, 2000);
-        }
-      });
-    })();
-
-    // ── SYS_LOG btn ───────────────────────────────────────
-    (function initSysLog() {
-      var btn = document.getElementById('sys-log-btn');
-      var API_BASE = (import.meta.env && import.meta.env.PUBLIC_API_BASE_URL) || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:8000' : 'https://glyph-api-qh9i.onrender.com');
-      var pathParts = window.location.pathname.split('/').filter(Boolean);
-      var repoId = pathParts[pathParts.length - 1];
-
-      btn.addEventListener('click', async function () {
-        btn.textContent = 'FETCHING_LOG...';
-        try {
-          var resp = await fetch(API_BASE + '/api/repo/' + repoId + '/status');
-          if (!resp.ok) throw new Error('HTTP ' + resp.status);
-          var data = await resp.json();
-          btn.textContent = (data.status || 'OK').toUpperCase();
-        } catch (err) {
-          btn.textContent = 'LOG_FAIL';
-        }
-        setTimeout(function () { btn.textContent = 'SYS_LOG'; }, 3000);
-      });
-    })();
 
     // ── TERMINATE btn ─────────────────────────────────────
     // POST /api/repo/:id/terminate — flips the backend cancel flag; the job
-    // stops at its next checkpoint and records status "terminated".
-    (function initTerminate() {
-      var btn = document.getElementById('terminate-btn');
-      var API_BASE = (import.meta.env && import.meta.env.PUBLIC_API_BASE_URL) || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:8000' : 'https://glyph-api-qh9i.onrender.com');
-      var pathParts = window.location.pathname.split('/').filter(Boolean);
-      var repoId = pathParts[pathParts.length - 1];
-
-      btn.addEventListener('click', async function () {
-        btn.textContent = 'TERMINATING...';
-        btn.disabled = true;
-        try {
-          var resp = await fetch(API_BASE + '/api/repo/' + repoId + '/terminate', {
-            method: 'POST',
-          });
-          if (!resp.ok) throw new Error('HTTP ' + resp.status);
-          btn.textContent = 'TERMINATED ✗';
-
-          var hb = document.getElementById('heartbeat-val');
-          if (hb) hb.textContent = 'TERMINATED';
-
-          // Surface the event in the recon stream immediately.
-          if (window.__glyphAppendStream) {
-            window.__glyphAppendStream('critical', 'ANALYSIS TERMINATED BY OPERATOR');
-          }
-        } catch (err) {
-          btn.textContent = 'TERM_FAIL';
-        }
-        btn.disabled = false;
-        setTimeout(function () { btn.textContent = 'TERMINATE'; }, 4000);
-      });
-    })();
 
     // ── EXPORT btn ────────────────────────────────────────
     // Bundles every analysis endpoint into a single JSON report + a
     // human-readable Markdown brief, downloaded client-side. No keys leave
-    // the browser beyond the normal per-request BYOK headers.
-    (function initExport() {
-      var btn = document.getElementById('export-btn');
-      var API_BASE = (import.meta.env && import.meta.env.PUBLIC_API_BASE_URL) || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:8000' : 'https://glyph-api-qh9i.onrender.com');
-      var pathParts = window.location.pathname.split('/').filter(Boolean);
-      var repoId = pathParts[pathParts.length - 1];
-      var IS_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-      btn.addEventListener('click', async function () {
-        // Demo/slug URLs are not backed by a real analysis — refuse honestly.
-        if (!IS_UUID.test(repoId)) {
-          btn.textContent = 'NO_DATA';
-          setTimeout(function () { btn.textContent = 'EXPORT'; }, 3000);
-          return;
-        }
-
-        btn.textContent = 'EXPORTING...';
-        btn.disabled = true;
-
-        function getJson(path) {
-          return fetch(API_BASE + path).then(function (r) {
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            return r.json();
-          });
-        }
-
-        try {
-          var [status, decisions, debates, rejections, contributors, graph] = await Promise.all([
-            getJson('/api/repo/' + repoId + '/status'),
-            getJson('/api/repo/' + repoId + '/decisions'),
-            getJson('/api/repo/' + repoId + '/debates'),
-            getJson('/api/repo/' + repoId + '/rejections'),
-            getJson('/api/repo/' + repoId + '/contributors'),
-            getJson('/api/repo/' + repoId + '/graph'),
-          ]);
-
-          // Summary is NIM-generated and needs the BYOK key; include it when available.
-          var summary = null;
-          try {
-            var nimKey = sessionStorage.getItem('glyph_nim_key') || '';
-            var sResp  = await fetch(API_BASE + '/api/repo/' + repoId + '/summary', {
-              headers: nimKey ? { 'X-Nim-Api-Key': nimKey } : {},
-            });
-            if (sResp.ok) summary = await sResp.json();
-          } catch (_) { /* optional — omit from report */ }
-
-          var report = {
-            glyph_version: '1.0.0',
-            exported_at: new Date().toISOString(),
-            repo: { id: repoId },
-            status: status,
-            summary: summary,
-            decisions: decisions.decisions || [],
-            debates: debates.debates || [],
-            debates_metrics: debates.metrics || null,
-            rejections: rejections.rejections || [],
-            contributors: contributors.contributors || [],
-            graph: graph,
-          };
-
-          // ── Download JSON ────────────────────────────────
-          var jsonBlob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
-          var a = document.createElement('a');
-          a.href = URL.createObjectURL(jsonBlob);
-          a.download = 'glyph-report-' + repoId + '.json';
-          a.click();
-          URL.revokeObjectURL(a.href);
-
-          // ── Build Markdown brief ─────────────────────────
-          var md = [];
-          md.push('# GLYPH Analysis Report');
-          md.push('');
-          md.push('- **Repository ID:** `' + repoId + '`');
-          md.push('- **Status:** ' + (status.status || 'unknown').toUpperCase());
-          if (status.stage) md.push('- **Stage:** ' + status.stage);
-          if (status.analyzed_at) md.push('- **Analyzed:** ' + String(status.analyzed_at).replace('T', ' ').replace('Z', ''));
-          if (status.error_message) md.push('- **Error:** ' + status.error_message);
-          md.push('');
-          if (summary && summary.narrative) {
-            md.push('## Narrative Summary');
-            md.push('');
-            md.push(summary.narrative);
-            md.push('');
-          }
-          if ((decisions.decisions || []).length) {
-            md.push('## Decisions (' + decisions.decisions.length + ')');
-            md.push('');
-            decisions.decisions.forEach(function (d) {
-              md.push('- **' + (d.title || 'UNTITLED') + '** — ' + (d.summary || '') +
-                (d.confidence === null || d.confidence === undefined
-                  ? ' (confidence not rated)'
-                  : ' (confidence ' + Math.round(d.confidence * 100) + '%)'));
-            });
-            md.push('');
-          }
-          if ((debates.debates || []).length) {
-            md.push('## Debates (' + debates.debates.length + ')');
-            md.push('');
-            debates.debates.forEach(function (d) {
-              md.push('- **' + (d.title || 'UNTITLED') + '** — ' + (d.summary || '') +
-                ' (contributors: ' + (Array.isArray(d.contributors) ? d.contributors.join(', ') : 'n/a') + ')');
-            });
-            md.push('');
-          }
-          if ((rejections.rejections || []).length) {
-            md.push('## Rejections (' + rejections.rejections.length + ')');
-            md.push('');
-            rejections.rejections.forEach(function (r) {
-              md.push('- **' + (r.title || 'UNTITLED') + '** — ' + (r.reasoning || r.summary || ''));
-            });
-            md.push('');
-          }
-          if ((contributors.contributors || []).length) {
-            md.push('## Contributors (' + contributors.contributors.length + ')');
-            md.push('');
-            contributors.contributors.forEach(function (c) {
-              md.push('- @' + c.handle + ' — ' + c.decisions + ' decisions, ' + c.debates +
-                ' debates, ' + c.rejections + ' rejections' +
-                (c.avg_confidence === null || c.avg_confidence === undefined
-                  ? ''
-                  : ' (avg confidence ' + c.avg_confidence + '%)'));
-            });
-            md.push('');
-          }
-          if (graph && graph.meta) {
-            md.push('## Graph');
-            md.push('');
-            md.push('- Nodes: ' + graph.meta.total_nodes + ' · Links: ' + graph.meta.total_links + ' · Density: ' + graph.meta.density_pct + '%');
-          }
-
-          var mdBlob = new Blob([md.join('\n')], { type: 'text/markdown' });
-          var m = document.createElement('a');
-          m.href = URL.createObjectURL(mdBlob);
-          m.download = 'glyph-report-' + repoId + '.md';
-          m.click();
-          URL.revokeObjectURL(m.href);
-
-          btn.textContent = 'EXPORTED ✓';
-          if (window.__glyphAppendStream) {
-            window.__glyphAppendStream('info', 'Report exported — JSON + Markdown');
-          }
-        } catch (err) {
-          btn.textContent = 'EXPORT_FAIL';
-          if (window.__glyphAppendStream) {
-            window.__glyphAppendStream('critical', 'REPORT EXPORT FAILED — ' + String(err.message || err));
-          }
-        }
-        btn.disabled = false;
-        setTimeout(function () { btn.textContent = 'EXPORT'; }, 5000);
-      });
-    })();
+    // EXPORT moved to components/RepoSidebar.astro so the control exists,
+    // and works, on every repo view rather than only the dashboard.
 
     // ── Override btn (demo-only; absent on real UUID jobs) ──
     (function initOverride() {
@@ -1418,6 +849,13 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
         setTimeout(function () { btn.textContent = 'INITIALIZE_OVERRIDE'; }, 3000);
       });
     })();
+
+    // RE_ANALYZE, TERMINATE and the section links now live in
+    // components/RepoSidebar.astro, which wires them itself so they behave
+    // the same on every page instead of only where they happened to be
+    // hooked up. The handlers that used to sit here referenced elements the
+    // shared sidebar no longer renders, and threw on load — taking the rest
+    // of this script block, including the status poller, down with them.
 
     // ── Live recon stream — real status/stage driven ───────
     (function initStream() {
@@ -1505,16 +943,10 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
           var status = data.status || 'unknown';
           var stage  = data.stage  || '';
 
-          // Name the repository. The URL is a bare UUID, so the header and
-          // document title render "unknown/unknown" until /status tells us
-          // which repository the job actually analysed.
+          // The document title and the navbar's repository name are filled in
+          // by RepoSidebar, which mounts on every repo view. Only this page has
+          // a THREAD CONTEXT line, so that one stays here.
           if (data.owner && data.name) {
-            var slug = data.owner + '/' + data.name;
-            var seededMeta = document.querySelector('meta[name="glyph-repo-slug"]');
-            var seeded = seededMeta && seededMeta.getAttribute('content');
-            if (seeded && document.title.indexOf(seeded) !== -1) {
-              document.title = document.title.replace(seeded, slug);
-            }
             document.querySelectorAll('[data-repo-context]').forEach(function (el) {
               el.textContent =
                 ('THREAD CONTEXT: ' + data.owner + '_' + data.name + '_ANALYSIS').toUpperCase();
@@ -1603,7 +1035,7 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
     import * as d3 from 'd3';
     // apiBase() owns the environment fallback. Hardcoding localhost:8000 here
     // made the deployed graph call the visitor's own machine and never render.
-    import { apiBase } from '../../scripts/repo-view';
+    import { apiBase, shortRef } from '../../scripts/repo-view';
 
     const API_BASE = apiBase();
 
@@ -1669,8 +1101,8 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
 
         const nodes = (data.nodes ?? []).map((n) => ({
           id:    n.id,
-          label: (n.label ?? 'UNKNOWN').toUpperCase().replace(/\s+/g, '_').slice(0, 22),
-          sha:   n.sha ?? 'N/A',
+          label: (n.label ?? 'UNKNOWN').toUpperCase().replace(/\s+/g, '_'),
+          ref:   shortRef(n.ref),
           type:  n.type ?? 'unknown',
         }));
         const links = (data.links ?? []).map((l) => ({
@@ -1779,13 +1211,49 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
         .attr('width', NODE_W).attr('height', NODE_H)
         .attr('stroke', d => TYPE_COLOR[d.type] || TYPE_COLOR.unknown);
 
+      // Every node used to be labelled "DECISION //" whatever it actually
+      // was, so rejection nodes read "DECISION // REJECTED_…".
+      const TYPE_LABEL = {
+        decision:      'DECISION',
+        debate:        'DEBATE',
+        rejection:     'REJECTION',
+        architectural: 'ARCH',
+        unknown:       'NODE',
+      };
+
+      // Both lines overflowed the 108px box by a wide margin. The label was
+      // cut to 22 characters, but 22 characters of 8px monospace is ~106px
+      // before the "DECISION // " prefix is added, so the text ran out across
+      // the graph. Measure what actually rendered and trim until it fits,
+      // leaving an ellipsis so the truncation is visible.
+      const INNER_W = NODE_W - 12;
+      function fitText(sel, full) {
+        sel.text(full);
+        const node = sel.node();
+        if (!node || node.getComputedTextLength() <= INNER_W) return;
+        let text = full;
+        while (text.length > 1 && node.getComputedTextLength() > INNER_W) {
+          text = text.slice(0, -1);
+          sel.text(text + '\u2026');
+        }
+      }
+
       nodeEl.append('text').attr('class', 'node-title')
         .attr('x', -NODE_W / 2 + 6).attr('y', -4)
-        .text(d => `DECISION // ${d.label}`);
+        .each(function (d) {
+          const prefix = TYPE_LABEL[d.type] || TYPE_LABEL.unknown;
+          fitText(d3.select(this), `${prefix} // ${d.label}`);
+        });
 
       nodeEl.append('text').attr('class', 'node-sha')
         .attr('x', -NODE_W / 2 + 6).attr('y', 9)
-        .text(d => `COMMIT: ${d.sha}`);
+        .each(function (d) {
+          fitText(d3.select(this), `REF: ${d.ref}`);
+        });
+
+      // The untruncated text stays reachable on hover and to assistive tech.
+      nodeEl.append('title')
+        .text(d => `${TYPE_LABEL[d.type] || TYPE_LABEL.unknown}: ${d.label} (${d.ref})`);
 
       simulation.on('tick', () => {
         linkEl

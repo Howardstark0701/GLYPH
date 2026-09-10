@@ -1,0 +1,399 @@
+---
+// GLYPH OS — the one left sidebar for every /repo/:id view.
+//
+// Previously each page built its own. They disagreed on width, on whether a
+// user block sat above the nav ("SYSTEM_OPERATOR", "OPERATOR_LVL 07",
+// "LEVEL 07 CLEAR" — none of which describe anything real), on the active-item
+// treatment (left border on some, solid red fill on others, red text on a
+// third), and on the footer controls. Clicking through the six sections
+// visibly rebuilt the sidebar each time.
+//
+// The controls live here too, so RE_ANALYZE and TERMINATE behave identically
+// on every page instead of working only on the one that happened to wire them.
+interface Props {
+  /** Job id (UUID) or demo slug from the route. */
+  id: string;
+  /** Which nav entry to mark current. */
+  active: 'terminal' | 'decisions' | 'debates' | 'rejections' | 'contributors' | 'summary';
+}
+const { id, active } = Astro.props;
+
+const items = [
+  { key: 'terminal',     label: 'TERMINAL',     href: `/repo/${id}` },
+  { key: 'decisions',    label: 'DECISIONS',    href: `/repo/${id}/decisions` },
+  { key: 'debates',      label: 'DEBATES',      href: `/repo/${id}/debates` },
+  { key: 'rejections',   label: 'REJECTIONS',   href: `/repo/${id}/rejections` },
+  { key: 'contributors', label: 'CONTRIBUTORS', href: `/repo/${id}/contributors` },
+  { key: 'summary',      label: 'SUMMARY',      href: `/repo/${id}/summary` },
+];
+---
+
+<aside id="sidebar" aria-label="Navigation sidebar">
+  <nav class="sidebar-nav" aria-label="Analysis sections">
+    {items.map((it) => (
+      <a
+        class:list={['nav-item', { active: it.key === active }]}
+        href={it.href}
+        aria-label={it.label}
+        aria-current={it.key === active ? 'page' : undefined}
+      >
+        <span class="nav-dot" aria-hidden="true"></span>
+        {it.label}
+      </a>
+    ))}
+  </nav>
+
+  <div class="sidebar-footer">
+    <button id="re-analyze" type="button" aria-label="Re-run the analysis for this repository">
+      RE_ANALYZE
+    </button>
+    <div class="sidebar-util-row">
+      <a class="util-btn" href="/" aria-label="Start a new analysis">NEW_ANALYSIS</a>
+      <button id="export-btn" class="util-btn" type="button" aria-label="Export this analysis as JSON and Markdown">
+        EXPORT
+      </button>
+      <button id="terminate-btn" class="util-btn util-btn-danger" type="button" aria-label="Terminate this analysis">
+        TERMINATE
+      </button>
+    </div>
+    <span id="sidebar-msg" role="status" aria-live="polite"></span>
+  </div>
+</aside>
+
+<style is:global>
+  #sidebar {
+    /* The width lives here, not on the page. The dashboard lays its shell out
+       with grid and the sub-pages with flex; a fixed width plus flex-shrink
+       behaves identically in both, which is what stops the sidebar resizing
+       as you click between sections. */
+    width: 172px;
+    flex-shrink: 0;
+    background: #131313;
+    border-right: 1px solid #262626;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #sidebar .sidebar-nav {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding-top: 10px;
+  }
+
+  #sidebar .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 14px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #a1a1a1;
+    text-decoration: none;
+    background: transparent;
+    border-left: 2px solid transparent;
+  }
+  #sidebar .nav-item .nav-dot {
+    width: 4px;
+    height: 4px;
+    flex-shrink: 0;
+    background: #3a3a3a;
+  }
+  #sidebar .nav-item:hover:not(.active) { color: #e5e2e1; background: #1a1a1a; }
+  #sidebar .nav-item.active {
+    border-left-color: #cc0000;
+    color: #ffffff;
+    background: transparent;
+  }
+  #sidebar .nav-item.active .nav-dot { background: #cc0000; }
+
+  #sidebar .sidebar-footer {
+    border-top: 1px solid #262626;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  #sidebar #re-analyze {
+    width: 100%;
+    background: #cc0000;
+    border: none;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #ffffff;
+    padding: 8px 0;
+    cursor: pointer;
+    text-align: center;
+  }
+  #sidebar #re-analyze:hover:not(:disabled) { background: #ff0000; }
+  #sidebar #re-analyze:disabled { background: #3a2320; cursor: default; }
+
+  #sidebar .sidebar-util-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  #sidebar .sidebar-util-row .util-btn-danger { grid-column: 1 / -1; }
+  #sidebar .util-btn {
+    flex: 1;
+    background: transparent;
+    border: 1px solid #262626;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.52rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #a1a1a1;
+    padding: 6px 0;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+  }
+  #sidebar .util-btn:hover { color: #e5e2e1; border-color: #3a3a3a; }
+  #sidebar .util-btn-danger:hover { color: #cc0000; border-color: #cc0000; }
+
+  #sidebar #sidebar-msg {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.5rem;
+    letter-spacing: 0.06em;
+    color: #5e3f3a;
+    min-height: 0.7rem;
+    overflow-wrap: anywhere;
+  }
+</style>
+
+<script>
+  import { getJobId, apiBase, fetchStatusResult, hydrateRepoIdentity }
+    from '../scripts/repo-view';
+
+  // Every repo view mounts this sidebar, so this is the one place the
+  // repository behind a bare job UUID needs to be resolved.
+  hydrateRepoIdentity();
+
+
+  const msg = (t: string) => {
+    const el = document.getElementById('sidebar-msg');
+    if (el) el.textContent = t;
+  };
+
+  const jobId = getJobId();
+
+  // Demo (slug) URLs have no job to act on, so the controls would be lies.
+  if (!jobId) {
+    document.getElementById('re-analyze')?.setAttribute('disabled', 'true');
+    document.getElementById('terminate-btn')?.setAttribute('disabled', 'true');
+  }
+
+  // ── RE_ANALYZE ────────────────────────────────────────────
+  // The old handler scraped the repository name out of the page header text
+  // and un-slugified it, which broke on any repo whose name contains an
+  // underscore. /status names the repository directly.
+  document.getElementById('re-analyze')?.addEventListener('click', async () => {
+    if (!jobId) return;
+
+    const github = sessionStorage.getItem('glyph_gh_token') ?? '';
+    const nim    = sessionStorage.getItem('glyph_nim_key')  ?? '';
+    if (!github || !nim) {
+      msg('KEYS_NOT_SET — configure them on the landing page');
+      return;
+    }
+
+    const res = await fetchStatusResult(jobId);
+    if (res.kind !== 'ok' || !res.status.github_url) {
+      msg('COULD_NOT_RESOLVE_REPOSITORY');
+      return;
+    }
+
+    msg('DISPATCHING…');
+    try {
+      const r = await fetch(`${apiBase()}/api/analyze`, {
+        method:  'POST',
+        headers: {
+          'Content-Type':   'application/json',
+          'X-Github-Token': github,
+          'X-Nim-Api-Key':  nim,
+        },
+        body: JSON.stringify({ repo_url: res.status.github_url }),
+      });
+      if (!r.ok) {
+        msg(`DISPATCH_FAILED — HTTP ${r.status}`);
+        return;
+      }
+      const data = await r.json();
+      window.location.href = `/repo/${data.job_id}`;
+    } catch {
+      msg('BACKEND_UNREACHABLE');
+    }
+  });
+
+  // ── EXPORT ────────────────────────────────────────────────
+    // the browser beyond the normal per-request BYOK headers.
+    (function initExport() {
+      var btn = document.getElementById('export-btn');
+      var API_BASE = apiBase();
+      // getJobId() already returns null for demo/slug URLs, and it reads the
+      // id from the right path segment on sub-pages too — the old code took
+      // the last segment, which on /repo/:id/decisions was "decisions".
+      var repoId = getJobId();
+
+      btn.addEventListener('click', async function () {
+        // Demo/slug URLs are not backed by a real analysis — refuse honestly.
+        if (!repoId) {
+          btn.textContent = 'NO_DATA';
+          setTimeout(function () { btn.textContent = 'EXPORT'; }, 3000);
+          return;
+        }
+
+        btn.textContent = 'EXPORTING...';
+        btn.disabled = true;
+
+        function getJson(path) {
+          return fetch(API_BASE + path).then(function (r) {
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          });
+        }
+
+        try {
+          var [status, decisions, debates, rejections, contributors, graph] = await Promise.all([
+            getJson('/api/repo/' + repoId + '/status'),
+            getJson('/api/repo/' + repoId + '/decisions'),
+            getJson('/api/repo/' + repoId + '/debates'),
+            getJson('/api/repo/' + repoId + '/rejections'),
+            getJson('/api/repo/' + repoId + '/contributors'),
+            getJson('/api/repo/' + repoId + '/graph'),
+          ]);
+
+          // Summary is NIM-generated and needs the BYOK key; include it when available.
+          var summary = null;
+          try {
+            var nimKey = sessionStorage.getItem('glyph_nim_key') || '';
+            var sResp  = await fetch(API_BASE + '/api/repo/' + repoId + '/summary', {
+              headers: nimKey ? { 'X-Nim-Api-Key': nimKey } : {},
+            });
+            if (sResp.ok) summary = await sResp.json();
+          } catch (_) { /* optional — omit from report */ }
+
+          var report = {
+            glyph_version: '1.0.0',
+            exported_at: new Date().toISOString(),
+            repo: { id: repoId },
+            status: status,
+            summary: summary,
+            decisions: decisions.decisions || [],
+            debates: debates.debates || [],
+            debates_metrics: debates.metrics || null,
+            rejections: rejections.rejections || [],
+            contributors: contributors.contributors || [],
+            graph: graph,
+          };
+
+          // ── Download JSON ────────────────────────────────
+          var jsonBlob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' });
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(jsonBlob);
+          a.download = 'glyph-report-' + repoId + '.json';
+          a.click();
+          URL.revokeObjectURL(a.href);
+
+          // ── Build Markdown brief ─────────────────────────
+          var md = [];
+          md.push('# GLYPH Analysis Report');
+          md.push('');
+          md.push('- **Repository ID:** `' + repoId + '`');
+          md.push('- **Status:** ' + (status.status || 'unknown').toUpperCase());
+          if (status.stage) md.push('- **Stage:** ' + status.stage);
+          if (status.analyzed_at) md.push('- **Analyzed:** ' + String(status.analyzed_at).replace('T', ' ').replace('Z', ''));
+          if (status.error_message) md.push('- **Error:** ' + status.error_message);
+          md.push('');
+          if (summary && summary.narrative) {
+            md.push('## Narrative Summary');
+            md.push('');
+            md.push(summary.narrative);
+            md.push('');
+          }
+          if ((decisions.decisions || []).length) {
+            md.push('## Decisions (' + decisions.decisions.length + ')');
+            md.push('');
+            decisions.decisions.forEach(function (d) {
+              md.push('- **' + (d.title || 'UNTITLED') + '** — ' + (d.summary || '') +
+                (d.confidence === null || d.confidence === undefined
+                  ? ' (confidence not rated)'
+                  : ' (confidence ' + Math.round(d.confidence * 100) + '%)'));
+            });
+            md.push('');
+          }
+          if ((debates.debates || []).length) {
+            md.push('## Debates (' + debates.debates.length + ')');
+            md.push('');
+            debates.debates.forEach(function (d) {
+              md.push('- **' + (d.title || 'UNTITLED') + '** — ' + (d.summary || '') +
+                ' (contributors: ' + (Array.isArray(d.contributors) ? d.contributors.join(', ') : 'n/a') + ')');
+            });
+            md.push('');
+          }
+          if ((rejections.rejections || []).length) {
+            md.push('## Rejections (' + rejections.rejections.length + ')');
+            md.push('');
+            rejections.rejections.forEach(function (r) {
+              md.push('- **' + (r.title || 'UNTITLED') + '** — ' + (r.reasoning || r.summary || ''));
+            });
+            md.push('');
+          }
+          if ((contributors.contributors || []).length) {
+            md.push('## Contributors (' + contributors.contributors.length + ')');
+            md.push('');
+            contributors.contributors.forEach(function (c) {
+              md.push('- @' + c.handle + ' — ' + c.decisions + ' decisions, ' + c.debates +
+                ' debates, ' + c.rejections + ' rejections' +
+                (c.avg_confidence === null || c.avg_confidence === undefined
+                  ? ''
+                  : ' (avg confidence ' + c.avg_confidence + '%)'));
+            });
+            md.push('');
+          }
+          if (graph && graph.meta) {
+            md.push('## Graph');
+            md.push('');
+            md.push('- Nodes: ' + graph.meta.total_nodes + ' · Links: ' + graph.meta.total_links + ' · Density: ' + graph.meta.density_pct + '%');
+          }
+
+          var mdBlob = new Blob([md.join('\n')], { type: 'text/markdown' });
+          var m = document.createElement('a');
+          m.href = URL.createObjectURL(mdBlob);
+          m.download = 'glyph-report-' + repoId + '.md';
+          m.click();
+          URL.revokeObjectURL(m.href);
+
+          btn.textContent = 'EXPORTED ✓';
+          if (window.__glyphAppendStream) {
+            window.__glyphAppendStream('info', 'Report exported — JSON + Markdown');
+          }
+        } catch (err) {
+          btn.textContent = 'EXPORT_FAIL';
+          if (window.__glyphAppendStream) {
+            window.__glyphAppendStream('critical', 'REPORT EXPORT FAILED — ' + String(err.message || err));
+          }
+        }
+        btn.disabled = false;
+        setTimeout(function () { btn.textContent = 'EXPORT'; }, 5000);
+      });
+    })();
+
+  // ── TERMINATE ─────────────────────────────────────────────
+  document.getElementById('terminate-btn')?.addEventListener('click', async () => {
+    if (!jobId) return;
+    msg('TERMINATING…');
+    try {
+      const r = await fetch(`${apiBase()}/api/repo/${jobId}/terminate`, { method: 'POST' });
+      msg(r.ok ? 'TERMINATE_SENT' : `TERMINATE_FAILED — HTTP ${r.status}`);
+    } catch {
+      msg('BACKEND_UNREACHABLE');
+    }
+  });
+</script>

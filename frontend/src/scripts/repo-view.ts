@@ -160,6 +160,24 @@ export async function hydrateRepoIdentity(): Promise<void> {
   });
 }
 
+/**
+ * Normalise a source reference for display.
+ *
+ * Models emit these loosely — "a1b2c3d", "commit: a1b2c3d", "PR #1822",
+ * "issue #17", "pull request #3655". Taking a fixed-length prefix produced
+ * labels like "COMMIT: commit:" and "0xPR #98", so pull out the identifier
+ * that is actually in there.
+ */
+export function shortRef(ref: unknown): string {
+  if (!ref) return 'N/A';
+  const text = String(ref).trim();
+  const sha = text.match(/[0-9a-f]{7,40}/i);
+  if (sha) return sha[0].slice(0, 7).toLowerCase();
+  const num = text.match(/#?(\d+)/);
+  if (num) return '#' + num[1];
+  return text.length > 12 ? text.slice(0, 12) + '\u2026' : text;
+}
+
 /** Consecutive unreachable ticks tolerated before the feed gives up. */
 const MAX_STATUS_FAILURES = 5;
 

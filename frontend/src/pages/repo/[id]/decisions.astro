@@ -92,6 +92,9 @@ const BUCKET_LABELS  = confBuckets.map(b => b.label);
 
 const statusColor = (s: Decision['status']) =>
   s === 'CRITICAL' ? '#cc0000' : s === 'RESOLVED' ? '#5e3f3a' : '#a1a1a1';
+import RepoNavbar from '../../../components/RepoNavbar.astro';
+import RepoSidebar from '../../../components/RepoSidebar.astro';
+
 ---
 
 <!DOCTYPE html>
@@ -141,92 +144,14 @@ const statusColor = (s: Decision['status']) =>
     .label-caps{ font-family: 'JetBrains Mono', monospace; font-size: 0.625rem; letter-spacing: 0.1em; text-transform: uppercase; line-height: 1; }
 
     /* ══════════════════════════════════════════════════════
-       NAVBAR — 44px fixed
-    ══════════════════════════════════════════════════════ */
-    #navbar {
-      position: fixed; top: 0; left: 0; right: 0; height: 44px;
-      background: #131313;
-      border-bottom: 1px solid #262626;
-      display: grid;
-      grid-template-columns: 160px 1fr auto;
-      align-items: center;
-      z-index: 200;
-    }
-    #nav-brand {
-      padding: 0 14px;
-      display: flex; flex-direction: column; gap: 2px;
-      border-right: 1px solid #262626; height: 100%; justify-content: center;
-    }
-    #nav-brand a {
-      font-family: 'Space Grotesk', sans-serif; font-weight: 700;
-      font-size: 0.875rem; color: #ffb4a8; text-decoration: none;
-      letter-spacing: -0.01em; line-height: 1;
-    }
-    #nav-brand .sub {
-      font-family: 'JetBrains Mono', monospace; font-size: 0.55rem;
-      color: #a1a1a1; letter-spacing: 0.06em; text-transform: uppercase;
-    }
-    #nav-title {
-      padding: 0 18px;
-      font-family: 'Space Grotesk', sans-serif; font-weight: 700;
-      font-size: 1rem; color: #e5e2e1; letter-spacing: 0.02em;
-    }
-    #nav-icons { display: flex; align-items: center; gap: 8px; padding-right: 16px; }
-    .nav-icon-btn {
-      width: 28px; height: 28px; background: transparent;
-      border: 1px solid #262626; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      color: #a1a1a1; padding: 0;
-    }
-    .nav-icon-btn:hover { border-color: #cc0000; color: #cc0000; }
-
-    /* ══════════════════════════════════════════════════════
        LAYOUT
     ══════════════════════════════════════════════════════ */
     #layout {
-      position: fixed; top: 44px; left: 0; right: 0; bottom: 0;
+      position: fixed; top: 48px; left: 0; right: 0; bottom: 0;
       display: flex;
     }
-
-    /* ══════════════════════════════════════════════════════
-       LEFT SIDEBAR — 160px
-    ══════════════════════════════════════════════════════ */
-    #sidebar {
-      width: 160px; flex-shrink: 0;
-      background: #131313; border-right: 1px solid #262626;
-      display: flex; flex-direction: column; overflow: hidden;
-    }
-    .sidebar-nav { flex: 1; display: flex; flex-direction: column; padding-top: 6px; }
-    .nav-item {
-      display: flex; align-items: center; gap: 9px; padding: 9px 14px;
-      font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
-      letter-spacing: 0.12em; text-transform: uppercase;
-      color: #a1a1a1; cursor: pointer; user-select: none;
-      border: none; border-left: 2px solid transparent;
-      background: transparent; width: 100%; text-align: left; text-decoration: none;
-    }
-    .nav-item:hover:not(.active) { color: #e5e2e1; background: #1a1a1a; }
-    .nav-item.active { border-left-color: #cc0000; color: #ffffff; background: transparent; }
     .sidebar-spacer { flex: 1; }
-    .nav-item-logout { border-top: 1px solid #262626; color: #5e3f3a; }
-    .nav-item-logout:hover { color: #cc0000; background: transparent; }
-    .sidebar-footer { border-top: 1px solid #262626; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-    #execute-fetch {
-      width: 100%; background: #cc0000; border: none;
-      font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
-      letter-spacing: 0.12em; text-transform: uppercase;
-      color: #fff; padding: 8px 0; cursor: pointer; text-align: center;
-    }
-    #execute-fetch:hover { background: #ff0000; }
     .util-row { display: flex; gap: 6px; }
-    .util-btn {
-      flex: 1; display: flex; align-items: center; gap: 5px;
-      background: transparent; border: 1px solid #262626;
-      color: #a1a1a1; font-family: 'JetBrains Mono', monospace;
-      font-size: 0.55rem; letter-spacing: 0.1em; text-transform: uppercase;
-      padding: 5px 6px; cursor: pointer; text-decoration: none;
-    }
-    .util-btn:hover { border-color: #cc0000; color: #cc0000; }
 
     /* ══════════════════════════════════════════════════════
        MAIN AREA
@@ -656,39 +581,7 @@ const statusColor = (s: Decision['status']) =>
   <!-- ════════════════════════════════════════════════════════
        NAVBAR
   ═════════════════════════════════════════════════════════ -->
-  <nav id="navbar" aria-label="System navigation">
-    <div id="nav-brand">
-      <a href="/" aria-label="Return to GLYPH home">GLYPH_OS</a>
-      <span class="sub">SYSTEM_OPERATOR</span>
-    </div>
-    <div id="nav-title">GLYPH_OS &nbsp;<span style="font-size:0.75rem;font-weight:400;color:#a1a1a1;letter-spacing:0.06em;">v4.0.2-STABLE</span></div>
-    <div id="nav-icons">
-      <!-- Clock -->
-      <button class="nav-icon-btn" aria-label="Clock" title="Clock">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-          <circle cx="6.5" cy="6.5" r="5.5" stroke="currentColor" stroke-width="1"/>
-          <line x1="6.5" y1="3" x2="6.5" y2="6.5" stroke="currentColor" stroke-width="1"/>
-          <line x1="6.5" y1="6.5" x2="9" y2="8" stroke="currentColor" stroke-width="1"/>
-        </svg>
-      </button>
-      <!-- Snowflake / network -->
-      <button class="nav-icon-btn" aria-label="Network" title="Network">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-          <line x1="6.5" y1="1" x2="6.5" y2="12" stroke="currentColor" stroke-width="1"/>
-          <line x1="1" y1="6.5" x2="12" y2="6.5" stroke="currentColor" stroke-width="1"/>
-          <line x1="2.5" y1="2.5" x2="10.5" y2="10.5" stroke="currentColor" stroke-width="1"/>
-          <line x1="10.5" y1="2.5" x2="2.5" y2="10.5" stroke="currentColor" stroke-width="1"/>
-        </svg>
-      </button>
-      <!-- Settings -->
-      <button class="nav-icon-btn" aria-label="Settings" title="Settings">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-          <circle cx="6.5" cy="6.5" r="2" stroke="currentColor" stroke-width="1"/>
-          <path d="M6.5 1v1.5M6.5 10.5V12M1 6.5h1.5M10.5 6.5H12M2.6 2.6l1.1 1.1M9.3 9.3l1.1 1.1M2.6 10.4l1.1-1.1M9.3 3.7l1.1-1.1" stroke="currentColor" stroke-width="1"/>
-        </svg>
-      </button>
-    </div>
-  </nav>
+  <RepoNavbar repoSlug={repoSlug} />
 
   <!-- ════════════════════════════════════════════════════════
        LAYOUT
@@ -696,91 +589,7 @@ const statusColor = (s: Decision['status']) =>
   <div id="layout">
 
     <!-- ── SIDEBAR ───────────────────────────────────────── -->
-    <aside id="sidebar" aria-label="Navigation">
-      <nav class="sidebar-nav" aria-label="Analysis sections">
-
-        <a class="nav-item" href={`/repo/${id}`} aria-label="Terminal">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <path d="M2 3l3 2-3 2" stroke="currentColor" stroke-width="1.2" fill="none"/>
-            <line x1="6" y1="7" x2="8" y2="7" stroke="currentColor" stroke-width="1.2"/>
-          </svg>
-          TERMINAL
-        </a>
-
-        <a class="nav-item active" href={`/repo/${id}/decisions`} aria-label="Decisions" aria-current="page">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <path d="M2 5l2 2 4-4" stroke="currentColor" stroke-width="1.2" fill="none"/>
-          </svg>
-          DECISIONS
-        </a>
-
-        <a class="nav-item" href={`/repo/${id}/debates`} aria-label="Debates">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <rect x="1" y="2" width="5" height="4" stroke="currentColor" stroke-width="1" fill="none"/>
-            <path d="M4 6v1.5l2.5-1.5H9V4H7" stroke="currentColor" stroke-width="1" fill="none"/>
-          </svg>
-          DEBATES
-        </a>
-
-        <a class="nav-item" href={`/repo/${id}/rejections`} aria-label="Rejections">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" stroke-width="1.2"/>
-            <line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" stroke-width="1.2"/>
-          </svg>
-          REJECTIONS
-        </a>
-
-        <a class="nav-item" href={`/repo/${id}/contributors`} aria-label="Contributors">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <circle cx="3.5" cy="3" r="1.5" stroke="currentColor" stroke-width="1"/>
-            <path d="M1 8.5c0-1.5 1-2.5 2.5-2.5s2.5 1 2.5 2.5" stroke="currentColor" stroke-width="1" fill="none"/>
-            <circle cx="7" cy="3" r="1.5" stroke="currentColor" stroke-width="1"/>
-            <path d="M5.5 8.5c0-1.5 1-2.5 2.5-2.5s2.5 1 2.5 2.5" stroke="currentColor" stroke-width="1" fill="none"/>
-          </svg>
-          CONTRIBUTORS
-        </a>
-
-        <a class="nav-item" href={`/repo/${id}/summary`} aria-label="Summary">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <rect x="2" y="1" width="6" height="8" stroke="currentColor" stroke-width="1" fill="none"/>
-            <line x1="3.5" y1="3.5" x2="6.5" y2="3.5" stroke="currentColor" stroke-width="1"/>
-            <line x1="3.5" y1="5.5" x2="6.5" y2="5.5" stroke="currentColor" stroke-width="1"/>
-          </svg>
-          SUMMARY
-        </a>
-
-        <a href="/" class="nav-item nav-item-logout" aria-label="New analysis">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <path d="M5 1v5" stroke="currentColor" stroke-width="1.2"/>
-            <path d="M2.5 3.2a3.5 3.5 0 105 0" stroke="currentColor" stroke-width="1.2" fill="none"/>
-          </svg>
-          NEW_ANALYSIS
-        </a>
-
-      </nav>
-
-      <div class="sidebar-footer">
-        <button id="execute-fetch" type="button" aria-label="Execute fetch">EXECUTE_FETCH</button>
-        <div class="util-row">
-          <button class="util-btn" aria-label="System log">
-            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
-              <rect x="0" y="0" width="8" height="8" stroke="currentColor" stroke-width="1" fill="none"/>
-              <line x1="1.5" y1="2.5" x2="6.5" y2="2.5" stroke="currentColor" stroke-width="0.8"/>
-              <line x1="1.5" y1="4"   x2="6.5" y2="4"   stroke="currentColor" stroke-width="0.8"/>
-              <line x1="1.5" y1="5.5" x2="4.5" y2="5.5" stroke="currentColor" stroke-width="0.8"/>
-            </svg>
-            SYS_LOG
-          </button>
-          <button class="util-btn" aria-label="Terminate">
-            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
-              <line x1="1" y1="1" x2="7" y2="7" stroke="currentColor" stroke-width="1"/>
-              <line x1="7" y1="1" x2="1" y2="7" stroke="currentColor" stroke-width="1"/>
-            </svg>
-            TERMINATE
-          </button>
-        </div>
-      </div>
-    </aside>
+    <RepoSidebar id={id} active="decisions" />
 
     <!-- ── MAIN AREA ──────────────────────────────────────── -->
     <div id="main-area">
@@ -989,12 +798,8 @@ const statusColor = (s: Decision['status']) =>
   <script type="application/json" id="glyph-seed" set:html={JSON.stringify({ seedDecisions: decisions })}></script>
 
   <script>
-    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed,
-             hydrateRepoIdentity } from '../../../scripts/repo-view';
-
-    // Name the repository this job analysed — the URL carries only a UUID,
-    // so the server-rendered title reads "unknown/unknown" until this lands.
-    hydrateRepoIdentity();
+    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed, shortRef }
+      from '../../../scripts/repo-view';
     import * as d3 from 'd3';
 
     const seedEl = document.getElementById('glyph-seed');
@@ -1304,15 +1109,6 @@ const statusColor = (s: Decision['status']) =>
     /// Reduce a source reference to something worth showing next to COMMIT:
     /// a 7-char SHA when one is present, else a PR/issue number, else the
     /// trimmed reference itself.
-    function shortRef(ref) {
-      if (!ref) return 'N/A';
-      const text = String(ref).trim();
-      const sha = text.match(/[0-9a-f]{7,40}/i);
-      if (sha) return sha[0].slice(0, 7).toLowerCase();
-      const num = text.match(/#?(\d+)/);
-      if (num) return '#' + num[1];
-      return text.length > 12 ? text.slice(0, 12) + '…' : text;
-    }
 
     // ── Hydrate from real API ─────────────────────────────
     (function hydrateDecisions() {
@@ -1514,15 +1310,9 @@ const statusColor = (s: Decision['status']) =>
       renderMonthGrid(seedDecisions);
     }
 
-    // ── Execute fetch ─────────────────────────────────────
-    (function() {
-      const btn = document.getElementById('execute-fetch');
-      if (!btn) return;
-      btn.addEventListener('click', () => {
-        btn.textContent = 'FETCHING...';
-        setTimeout(() => { btn.textContent = 'EXECUTE_FETCH'; }, 2000);
-      });
-    })();
+    // The EXECUTE_FETCH button that used to sit here fetched nothing: it set
+    // its own label to "FETCHING..." for two seconds and changed it back. The
+    // shared sidebar's RE_ANALYZE control dispatches a real analysis instead.
 
     // ── Live stream ───────────────────────────────────────
     (function initStream() {

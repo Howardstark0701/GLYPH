@@ -185,11 +185,14 @@ pub async fn get_graph(
         "id": r.id, "label": r.title.as_deref().unwrap_or("UNKNOWN"),
         "type": r.node_type.as_deref().unwrap_or("unknown"),
         "summary": r.summary, "confidence": r.confidence,
-        "sha": r.source_refs.as_ref()
+        // The raw first reference, not a mangled one. This used to take the
+        // first seven bytes and prefix "0x", which turned "PR #98" into
+        // "0xPR #98" and "commit: a1b2c3d" into "0xcommit" — and could panic
+        // outright by slicing through a multi-byte character. The client
+        // normalises it with the same shortRef() the decision cards use.
+        "ref": r.source_refs.as_ref()
             .and_then(|v| v.as_array()).and_then(|a| a.first())
             .and_then(|v| v.as_str())
-            .map(|s| format!("0x{}", &s[..s.len().min(7)]))
-            .unwrap_or_else(|| "N/A".into())
     })).collect();
 
     let mut links: Vec<Value> = Vec::new();

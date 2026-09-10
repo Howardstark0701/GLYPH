@@ -84,6 +84,9 @@ const statusColor = debateThread.status === 'HEATED'
   : debateThread.status === 'RESOLVED'
   ? '#a1a1a1'
   : '#5e3f3a';
+import RepoNavbar from '../../../components/RepoNavbar.astro';
+import RepoSidebar from '../../../components/RepoSidebar.astro';
+
 ---
 
 <!DOCTYPE html>
@@ -131,116 +134,16 @@ const statusColor = debateThread.status === 'HEATED'
     .data-lg    { font-family: 'JetBrains Mono', monospace; font-size: 1.25rem; font-weight: 700; line-height: 1; }
     .label-caps { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase; line-height: 1rem; }
 
-    /* ══════════════════════════════════════════════════════
-       TOP NAVBAR — 44px
-    ══════════════════════════════════════════════════════ */
-    #navbar {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      height: 44px;
-      background: #131313;
-      border-bottom: 1px solid #262626;
-      display: grid;
-      grid-template-columns: 200px 1fr auto;
-      align-items: center;
-      padding: 0 16px;
-      z-index: 200;
-    }
-    #nav-brand a {
-      font-family: 'Space Grotesk', sans-serif;
-      font-weight: 700;
-      font-size: 1.1rem;
-      color: #ffb4a8;
-      text-decoration: none;
-      letter-spacing: -0.01em;
-    }
-    #nav-search {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    #nav-search input {
-      width: 280px;
-      height: 28px;
-      background: #131313;
-      border: 1px solid #262626;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.6875rem;
-      color: #e5e2e1;
-      padding: 0 10px;
-      letter-spacing: 0.04em;
-    }
-    #nav-search input::placeholder { color: #3a3a3a; }
-    #nav-icons {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .nav-icon-btn {
-      width: 28px; height: 28px;
-      background: transparent;
-      border: 1px solid #262626;
-      cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      color: #a1a1a1;
-      padding: 0;
-    }
-    .nav-icon-btn:hover { border-color: #cc0000; color: #cc0000; }
-
     /* ── Sub-navbar coord strip ───────────────────────────── */
     /* ══════════════════════════════════════════════════════
        LAYOUT
     ══════════════════════════════════════════════════════ */
     #layout {
       position: fixed;
-      top: 44px; left: 0; right: 0; bottom: 0;
+      top: 48px; left: 0; right: 0; bottom: 0;
       display: flex;
     }
-
-    /* ══════════════════════════════════════════════════════
-       LEFT SIDEBAR — 160px
-    ══════════════════════════════════════════════════════ */
-    #sidebar {
-      width: 160px;
-      flex-shrink: 0;
-      background: #131313;
-      border-right: 1px solid #262626;
-      display: flex;
-      flex-direction: column;
-      padding-top: 28px; /* offset for coord strip */
-      overflow: hidden;
-      z-index: 180;
-    }
-    .sidebar-nav { flex: 1; display: flex; flex-direction: column; padding-top: 6px; }
-    .nav-item {
-      display: flex; align-items: center; gap: 9px;
-      padding: 9px 14px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 0.6rem; letter-spacing: 0.12em; text-transform: uppercase;
-      color: #a1a1a1;
-      cursor: pointer; user-select: none;
-      border: none; background: transparent;
-      width: 100%; text-align: left; text-decoration: none;
-    }
-    .nav-item:hover:not(.active) { color: #e5e2e1; background: #1a1a1a; }
-    .nav-item.active { background: #cc0000; color: #ffffff; }
-    .sidebar-footer { border-top: 1px solid #262626; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
-    #execute-fetch {
-      width: 100%; background: #cc0000; border: none;
-      font-family: 'JetBrains Mono', monospace; font-size: 0.6rem;
-      letter-spacing: 0.12em; text-transform: uppercase;
-      color: #ffffff; padding: 8px 0; cursor: pointer; text-align: center;
-    }
-    #execute-fetch:hover { background: #ff0000; }
     .util-row { display: flex; gap: 6px; }
-    .util-btn {
-      flex: 1; display: flex; align-items: center; gap: 5px;
-      background: transparent; border: 1px solid #262626;
-      color: #a1a1a1; font-family: 'JetBrains Mono', monospace;
-      font-size: 0.55rem; letter-spacing: 0.1em; text-transform: uppercase;
-      padding: 5px 6px; cursor: pointer;
-    }
-    .util-btn:hover { border-color: #cc0000; color: #cc0000; }
 
     /* ══════════════════════════════════════════════════════
        MAIN AREA
@@ -494,47 +397,7 @@ const statusColor = debateThread.status === 'HEATED'
   <!-- ════════════════════════════════════════════════════════
        TOP NAVBAR
   ═════════════════════════════════════════════════════════ -->
-  <nav id="navbar" aria-label="Dashboard navigation">
-    <div id="nav-brand">
-      <a href="/" aria-label="Return to GLYPH home">GLYPH</a>
-    </div>
-    <div id="nav-search" role="search">
-      <input
-        type="search"
-        placeholder="QUERY_THREADS..."
-        autocomplete="off"
-        spellcheck="false"
-        aria-label="Query debate threads"
-      />
-    </div>
-    <div id="nav-icons" aria-label="Dashboard actions">
-      <!-- Contributors -->
-      <button class="nav-icon-btn" aria-label="Contributors" title="Contributors">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-          <circle cx="5" cy="4" r="2" stroke="currentColor" stroke-width="1"/>
-          <circle cx="9" cy="4" r="2" stroke="currentColor" stroke-width="1"/>
-          <path d="M1 11c0-2 1.8-3 4-3s4 1 4 3" stroke="currentColor" stroke-width="1" fill="none"/>
-          <path d="M9 8c1.5 0 3 0.8 3 3" stroke="currentColor" stroke-width="1" fill="none"/>
-        </svg>
-      </button>
-      <!-- Mail -->
-      <button class="nav-icon-btn" aria-label="Messages" title="Mail">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-          <rect x="1" y="2.5" width="11" height="8" stroke="currentColor" stroke-width="1"/>
-          <polyline points="1,2.5 6.5,7.5 12,2.5" stroke="currentColor" stroke-width="1" fill="none"/>
-        </svg>
-      </button>
-      <!-- Signal -->
-      <button class="nav-icon-btn" aria-label="Signal strength" title="Signal">
-        <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-          <rect x="1"  y="8"  width="2" height="4" fill="currentColor"/>
-          <rect x="4"  y="6"  width="2" height="6" fill="currentColor"/>
-          <rect x="7"  y="4"  width="2" height="8" fill="currentColor"/>
-          <rect x="10" y="2"  width="2" height="10" fill="currentColor" opacity="0.4"/>
-        </svg>
-      </button>
-    </div>
-  </nav>
+  <RepoNavbar repoSlug={repoSlug} />
 
   <!-- ════════════════════════════════════════════════════════
        LAYOUT
@@ -542,91 +405,7 @@ const statusColor = debateThread.status === 'HEATED'
   <div id="layout">
 
     <!-- ── LEFT SIDEBAR ─────────────────────────────────── -->
-    <aside id="sidebar" aria-label="Navigation sidebar">
-      <nav class="sidebar-nav" aria-label="Analysis sections">
-
-        <a class="nav-item" href={`/repo/${id}`} aria-label="Terminal">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <path d="M2 3l3 2-3 2" stroke="currentColor" stroke-width="1.2" fill="none"/>
-            <line x1="6" y1="7" x2="8" y2="7" stroke="currentColor" stroke-width="1.2"/>
-          </svg>
-          TERMINAL
-        </a>
-
-        <a class="nav-item" href={`/repo/${id}/decisions`} aria-label="Decisions">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <path d="M2 5l2 2 4-4" stroke="currentColor" stroke-width="1.2" fill="none"/>
-          </svg>
-          DECISIONS
-        </a>
-
-        <a class="nav-item active" href={`/repo/${id}/debates`} aria-label="Debates" aria-current="page">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <rect x="1" y="2" width="5" height="4" stroke="currentColor" stroke-width="1" fill="none"/>
-            <path d="M4 6v1.5l2.5-1.5H9V4H7" stroke="currentColor" stroke-width="1" fill="none"/>
-          </svg>
-          DEBATES
-        </a>
-
-        <a class="nav-item" href={`/repo/${id}/rejections`} aria-label="Rejections">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" stroke-width="1.2"/>
-            <line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" stroke-width="1.2"/>
-          </svg>
-          REJECTIONS
-        </a>
-
-        <a class="nav-item" href={`/repo/${id}/contributors`} aria-label="Contributors">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <circle cx="3.5" cy="3" r="1.5" stroke="currentColor" stroke-width="1"/>
-            <path d="M1 8.5c0-1.5 1-2.5 2.5-2.5s2.5 1 2.5 2.5" stroke="currentColor" stroke-width="1" fill="none"/>
-            <circle cx="7" cy="3" r="1.5" stroke="currentColor" stroke-width="1"/>
-            <path d="M5.5 8.5c0-1.5 1-2.5 2.5-2.5s2.5 1 2.5 2.5" stroke="currentColor" stroke-width="1" fill="none"/>
-          </svg>
-          CONTRIBUTORS
-        </a>
-
-        <a class="nav-item" href={`/repo/${id}/summary`} aria-label="Summary">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <rect x="2" y="1" width="6" height="8" stroke="currentColor" stroke-width="1" fill="none"/>
-            <line x1="3.5" y1="3.5" x2="6.5" y2="3.5" stroke="currentColor" stroke-width="1"/>
-            <line x1="3.5" y1="5.5" x2="6.5" y2="5.5" stroke="currentColor" stroke-width="1"/>
-          </svg>
-          SUMMARY
-        </a>
-
-        <a href="/" class="nav-item nav-item-logout" aria-label="New analysis">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <path d="M5 1v5" stroke="currentColor" stroke-width="1.2"/>
-            <path d="M2.5 3.2a3.5 3.5 0 105 0" stroke="currentColor" stroke-width="1.2" fill="none"/>
-          </svg>
-          NEW_ANALYSIS
-        </a>
-
-      </nav>
-
-      <div class="sidebar-footer">
-        <button id="execute-fetch" type="button" aria-label="Execute fetch">EXECUTE_FETCH</button>
-        <div class="util-row">
-          <button class="util-btn" aria-label="System log">
-            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
-              <rect x="0" y="0" width="8" height="8" stroke="currentColor" stroke-width="1" fill="none"/>
-              <line x1="1.5" y1="2.5" x2="6.5" y2="2.5" stroke="currentColor" stroke-width="0.8"/>
-              <line x1="1.5" y1="4"   x2="6.5" y2="4"   stroke="currentColor" stroke-width="0.8"/>
-              <line x1="1.5" y1="5.5" x2="4.5" y2="5.5" stroke="currentColor" stroke-width="0.8"/>
-            </svg>
-            SYS_LOG
-          </button>
-          <button class="util-btn" aria-label="Terminate session">
-            <svg width="8" height="8" viewBox="0 0 8 8" fill="none" aria-hidden="true">
-              <line x1="1" y1="1" x2="7" y2="7" stroke="currentColor" stroke-width="1"/>
-              <line x1="7" y1="1" x2="1" y2="7" stroke="currentColor" stroke-width="1"/>
-            </svg>
-            TERMINATE
-          </button>
-        </div>
-      </div>
-    </aside>
+    <RepoSidebar id={id} active="debates" />
 
     <!-- ── MAIN AREA ─────────────────────────────────────── -->
     <div id="main-area">
@@ -890,12 +669,8 @@ const statusColor = debateThread.status === 'HEATED'
   <script type="application/json" id="glyph-seed" set:html={JSON.stringify({ sentimentBars, prNumber: debateThread.prNumber, contributors })}></script>
 
   <script>
-    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed,
-             hydrateRepoIdentity } from '../../../scripts/repo-view';
-
-    // Name the repository this job analysed — the URL carries only a UUID,
-    // so the server-rendered title reads "unknown/unknown" until this lands.
-    hydrateRepoIdentity();
+    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed }
+      from '../../../scripts/repo-view';
 
     const seedEl = document.getElementById('glyph-seed');
     const { sentimentBars, prNumber, contributors } =
@@ -918,15 +693,9 @@ const statusColor = debateThread.status === 'HEATED'
       const d = new Date();
       return `[${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}]`;
     }
-    // ── Execute fetch ─────────────────────────────────────
-    (function() {
-      const btn = document.getElementById('execute-fetch');
-      if (!btn) return;
-      btn.addEventListener('click', () => {
-        btn.textContent = 'FETCHING...';
-        setTimeout(() => { btn.textContent = 'EXECUTE_FETCH'; }, 2000);
-      });
-    })();
+    // The EXECUTE_FETCH button that used to sit here fetched nothing: it set
+    // its own label to "FETCHING..." for two seconds and changed it back. The
+    // shared sidebar's RE_ANALYZE control dispatches a real analysis instead.
 
     // ── Hydrate ALL panels from real API ──────────────────
     // Real jobs (UUID ids) get every panel rendered from
