@@ -111,6 +111,12 @@ export function startStatusFeed(
 
   const append = (html: string) => {
     const line = document.createElement('div');
+    // Host pages style their own feed lines; carry the terminal type across
+    // so a status line never renders in the page's proportional body font.
+    line.className = 'stream-line glyph-feed-line';
+    line.style.cssText =
+      'font-family:JetBrains Mono,monospace;font-size:0.6rem;line-height:1.6;' +
+      'letter-spacing:0.04em;overflow-wrap:anywhere;word-break:break-word;';
     line.innerHTML = html;
     container.appendChild(line);
     container.scrollTop = container.scrollHeight;

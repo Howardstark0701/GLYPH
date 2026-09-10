@@ -162,8 +162,11 @@ import '../styles/global.css';
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding-top: 80px;
-      padding-bottom: 48px;
+      /* Scales with viewport height so the BYOK trace below still fits on a
+         768px laptop/projector, where the fixed 80px/48px pair pushed the
+         last node off the bottom of the screen. */
+      padding-top: clamp(40px, 7vh, 80px);
+      padding-bottom: clamp(24px, 4vh, 48px);
       width: 100%;
       overflow: visible;
       position: relative;
@@ -321,7 +324,7 @@ import '../styles/global.css';
       display: flex;
       flex-direction: column;
       align-items: center;
-      padding: 40px 0 60px;
+      padding: clamp(16px, 3vh, 40px) 0 clamp(24px, 4vh, 60px);
     }
 
     .byok-node-wrap {
@@ -329,7 +332,7 @@ import '../styles/global.css';
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      gap: 48px;
+      gap: clamp(22px, 4vh, 48px);
       width: 192px;
       margin: 0 auto;
     }
@@ -712,25 +715,49 @@ import '../styles/global.css';
     #byok-confirm-btn:hover { background: #ff0000; }
     #byok-confirm-btn:disabled { background: #2a2a2a; color: #5e3f3a; cursor: not-allowed; }
 
-    /* Key indicator next to submit button */
+    /* Key setup CTA — the first thing a new visitor must click. It used
+       `align-self: flex-start` inside the centred hero column, which threw it
+       to the far-left page margin where it was half-clipped and easy to miss.
+       It now sits in a block the same width as the uplink input. */
+    #key-status-row {
+      width: 100%;
+      max-width: 640px;
+      margin-top: 10px;
+      display: flex;
+      justify-content: flex-start;
+    }
     #key-status {
       font-family: 'JetBrains Mono', monospace;
-      font-size: 0.6rem;
+      font-size: 0.625rem;
       letter-spacing: 0.08em;
       text-transform: uppercase;
-      color: #5e3f3a;
-      padding: 0 10px;
-      display: flex;
+      color: #ffb4a8;
+      background: transparent;
+      padding: 5px 10px;
+      display: inline-flex;
       align-items: center;
-      border-left: 1px solid #262626;
+      gap: 8px;
+      border: 1px solid #5e3f3a;
       cursor: pointer;
       user-select: none;
       white-space: nowrap;
-      margin-top: 12px;
-      align-self: flex-start;
     }
-    #key-status.set { color: #cc0000; border-color: #cc0000; }
-    #key-status:hover { color: #cc0000; }
+    #key-status::before {
+      content: '';
+      width: 6px; height: 6px;
+      background: #ffb4a8;
+      flex-shrink: 0;
+      animation: key-status-pulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes key-status-pulse {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: 0.2; }
+    }
+    #key-status:hover { color: #cc0000; border-color: #cc0000; }
+    #key-status:hover::before { background: #cc0000; }
+    /* Keys configured: steady, muted, no longer demanding attention. */
+    #key-status.set { color: #a1a1a1; border-color: #262626; }
+    #key-status.set::before { background: #22d3ee; animation: none; }
   </style>
 </head>
 <body>
@@ -807,9 +834,11 @@ import '../styles/global.css';
       </div>
 
       <!-- Key setup indicator -->
-      <button id="key-status" type="button" aria-label="Configure API keys">
-        KEYS: NOT_SET — CLICK TO CONFIGURE
-      </button>
+      <div id="key-status-row">
+        <button id="key-status" type="button" aria-label="Configure API keys">
+          KEYS: NOT_SET — CLICK TO CONFIGURE
+        </button>
+      </div>
     </section>
 
     <!-- ── BYOK Trace ────────────────────────────────────── -->
@@ -921,8 +950,10 @@ import '../styles/global.css';
         </div>
 
         <p id="byok-notice">
-          Keys are held in session memory only. Never written to disk, never sent to GLYPH servers.
-          They travel as request headers directly to GitHub and NVIDIA NIM. Cleared on page refresh.
+          Keys are held in your browser's session memory and never written to disk.
+          Each request carries them as headers so the GLYPH backend can call GitHub and
+          NVIDIA NIM on your behalf — used for that request and discarded, never persisted
+          to the database and never written to logs. Cleared on page refresh.
         </p>
 
         <button id="byok-confirm-btn" type="button" disabled aria-label="Confirm and save keys">
@@ -941,12 +972,12 @@ import '../styles/global.css';
       <span class="syslog-title">SYSLOG_DAEMON</span>
       <span class="syslog-status-chip" role="status">ACTIVE</span>
     </div>
+    <!-- Populated by the client with events that genuinely happened in this
+         session. The previous fixed lines (SSL_HANDSHAKE, SCANNING_PORTS,
+         PACKET_LOSS, THERMAL_NOMINAL) described nothing real — a browser
+         cannot observe any of it. -->
     <div id="syslog-body" role="log" aria-label="System log entries">
-      <div class="log-line">[00:50:33] SYNCING_LOCAL_CLOCK...</div>
-      <div class="log-line">[00:50:36] REDUNDANCY_CHECK_COMPLETE</div>
-      <div class="log-line">[00:50:39] HEARTBEAT_STABLE</div>
-      <div class="log-line">[00:50:42] SSL_HANDSHAKE_INITIALIZING</div>
-      <div class="log-line">[00:50:45] SYNCING_LOCAL_CLOCK...</div>
+      <div class="log-line">[--:--:--] AWAITING_SESSION_EVENTS</div>
     </div>
   </aside>
 
@@ -956,9 +987,9 @@ import '../styles/global.css';
   <footer id="statusbar" aria-label="System status bar">
     <!-- Left: status indicators -->
     <div class="data-sm text-muted" style="display:flex;align-items:center;gap:8px;">
-      <span style="color:#e5e2e1;">SYSTEM_STABLE</span>
+      <span id="api-state" style="color:#a1a1a1;">API: CHECKING…</span>
       <span aria-hidden="true">·</span>
-      <span>LATENCY: <span id="latency-val">12ms</span></span>
+      <span>LATENCY: <span id="latency-val">—</span></span>
     </div>
     <!-- Right: UTC timestamp + terminate -->
     <div style="display:flex;align-items:center;gap:12px;">
@@ -1063,44 +1094,92 @@ import '../styles/global.css';
       tick();
     })();
 
-    // ── Syslog live append ────────────────────────────────
+    // ── Syslog: real session events ───────────────────────
+    // Exposes window.glyphLog(msg) so the rest of the page can record what it
+    // actually did. Nothing here is invented; if nothing happens, the panel
+    // stays quiet rather than manufacturing traffic.
     (function initSyslog() {
       const body = document.getElementById('syslog-body')!;
-      // Boot/system events only — this terminal makes no analysis claims
-      // until a real job is submitted; that work lives in /repo/:id.
-      const events: string[] = [
-        'SCANNING_PORTS...',
-        'SSL_HANDSHAKE_INITIALIZING',
-        'REDUNDANCY_CHECK_COMPLETE',
-        'PACKET_LOSS: 0.00%',
-        'SIGNAL_STRENGTH_MAX',
-        'SECURITY_BYPASS_ATTEMPT_NULLIFIED',
-        'SYNCING_LOCAL_CLOCK...',
-        'HEARTBEAT_STABLE',
-        'KERNEL_MODULES_LOADED',
-        'GPU_DMA_POOL_LINKED',
-        'IO_QUEUES_READY',
-        'MEMORY_MAP_OK',
-        'THERMAL_NOMINAL',
-        'UPLINK_LOCKED',
-      ];
-      let idx = 0;
-      const startMs = Date.now();
+      let seeded = false;
 
-      setInterval(() => {
-        const elapsed = Date.now() - startMs;
-        const s  = Math.floor(elapsed / 1000);
-        const ms = Math.floor((elapsed % 1000) / 10);
-        const pad = (n: number, d: number) => String(n).padStart(d, '0');
-        const ts  = `[${pad(Math.floor(s/3600),2)}:${pad(Math.floor((s%3600)/60),2)}:${pad(s%60,2)}]`;
-        const ev  = events[idx % events.length];
-        idx++;
+      function stamp(): string {
+        const d = new Date();
+        const p = (n: number) => String(n).padStart(2, '0');
+        return `[${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}]`;
+      }
 
+      function log(msg: string, tone: 'info' | 'warn' | 'ok' = 'info') {
+        if (!seeded) { body.innerHTML = ''; seeded = true; }
         const line = document.createElement('div');
-        line.textContent = `${ts} ${ev}`;
+        line.className = 'log-line';
+        if (tone === 'warn') line.style.color = '#cc0000';
+        if (tone === 'ok')   line.style.color = '#22d3ee';
+        line.textContent = `${stamp()} ${msg}`;
         body.appendChild(line);
-        while (body.children.length > 5) body.removeChild(body.firstChild!);
-      }, 2400);
+        body.scrollTop = body.scrollHeight;
+        while (body.children.length > 40) body.removeChild(body.firstChild!);
+      }
+
+      (window as any).glyphLog = log;
+
+      log(`SESSION_START ${window.location.host}`);
+      const hasKeys = !!sessionStorage.getItem('glyph_nim_key')
+        && !!sessionStorage.getItem('glyph_gh_token');
+      log(hasKeys ? 'CREDENTIALS_PRESENT_IN_SESSION' : 'CREDENTIALS_NOT_SET',
+          hasKeys ? 'ok' : 'info');
+
+      window.addEventListener('online',  () => log('NETWORK_ONLINE', 'ok'));
+      window.addEventListener('offline', () => log('NETWORK_OFFLINE', 'warn'));
+    })();
+
+    // ── Backend health probe ──────────────────────────────
+    // Drives the status bar from the real API state, so a dead backend is
+    // visible immediately instead of being masked by a static "SYSTEM_STABLE
+    // · LATENCY: 12ms" that was never measured.
+    (function initHealthProbe() {
+      const stateEl   = document.getElementById('api-state');
+      const latencyEl = document.getElementById('latency-val');
+      if (!stateEl || !latencyEl) return;
+      // Log transitions only, so a healthy backend does not spam the panel.
+      let lastState: 'up' | 'down' | null = null;
+
+      async function probe() {
+        const t0 = performance.now();
+        try {
+          const ctl  = new AbortController();
+          const kill = setTimeout(() => ctl.abort(), 8000);
+          const r    = await fetch(`${API_BASE}/health`, { signal: ctl.signal, cache: 'no-store' });
+          clearTimeout(kill);
+          const ms = Math.round(performance.now() - t0);
+          latencyEl.textContent = `${ms}ms`;
+          if (r.ok) {
+            stateEl.textContent = 'API: ONLINE';
+            stateEl.style.color = '#22d3ee';
+            if (lastState !== 'up') {
+              (window as any).glyphLog?.(`API_REACHABLE ${ms}ms`, 'ok');
+              lastState = 'up';
+            }
+          } else {
+            stateEl.textContent = `API: HTTP_${r.status}`;
+            stateEl.style.color = '#cc0000';
+            if (lastState !== 'down') {
+              (window as any).glyphLog?.(`API_ERROR HTTP_${r.status}`, 'warn');
+              lastState = 'down';
+            }
+          }
+        } catch {
+          stateEl.textContent = 'API: UNREACHABLE';
+          stateEl.style.color = '#cc0000';
+          latencyEl.textContent = '—';
+          if (lastState !== 'down') {
+            (window as any).glyphLog?.('API_UNREACHABLE backend not responding', 'warn');
+            lastState = 'down';
+          }
+        }
+      }
+
+      probe();
+      setInterval(probe, 30000);
     })();
 
     // ── BYOK scroll trace removed — replaced with CSS-only implementation ──

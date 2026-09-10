@@ -76,6 +76,14 @@ const topMakers = Object.entries(
   .slice(0, 3)
   .map(([handle, count]) => ({ handle, count, pct: Math.round(count / decisions.length * 100) }));
 
+// Real (UUID) jobs must never render seed-derived numbers. Every stat below
+// is served as an em-dash placeholder and hydrated from
+// GET /api/repo/:id/decisions by the client. Only slug/demo URLs see seeds.
+const seedStats      = IS_UUID ? null : stats;
+const seedBuckets    = IS_UUID ? []   : confBuckets;
+const seedTopMakers  = IS_UUID ? []   : topMakers;
+const BUCKET_LABELS  = confBuckets.map(b => b.label);
+
 const statusColor = (s: Decision['status']) =>
   s === 'CRITICAL' ? '#cc0000' : s === 'RESOLVED' ? '#5e3f3a' : '#a1a1a1';
 ---
@@ -89,7 +97,14 @@ const statusColor = (s: Decision['status']) =>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <style>
+  <!-- is:global is required, not cosmetic. Astro scopes page CSS with a
+       [data-astro-cid-*] attribute that only server-rendered markup carries.
+       Every element these pages build in JS (live-feed lines, hydrated
+       decision/contributor cards, D3 nodes) is created with innerHTML or
+       document.createElement and therefore has no scope attribute — under
+       scoped CSS it renders completely unstyled. This page's stylesheet is
+       self-contained and loaded by this page alone, so going global is safe. -->
+  <style is:global>
     /* ── Reset ───────────────────────────────────────────── */
     *, *::before, *::after {
       box-sizing: border-box;
@@ -249,12 +264,146 @@ const statusColor = (s: Decision['status']) =>
     }
 
     /* D3 chronological timeline strip (fixed height on top) */
-    #d3-panel {
-      flex-shrink: 0; height: 196px;
+    /* Chart strip: the chronology scatter and the per-month density grid sit
+       side by side. The scatter alone was ~1000px wide for a couple of dozen
+       points; splitting the strip gives both marks a sensible density without
+       spending any extra vertical space, which the decision list needs. */
+    #chart-strip {
+      flex-shrink: 0;
+      display: flex;
+      align-items: stretch;
+      height: 214px;
       border-bottom: 1px solid #262626;
+    }
+
+    #d3-panel {
+      flex: 1 1 auto;
+      min-width: 0;
+      border-right: 1px solid #262626;
       padding: 12px 16px 6px;
       position: relative;
     }
+
+    /* ── Per-month decision density ───────────────────────── */
+    /* Sized to the grid itself (24px gutter + 12 x 16px cells + gaps = 252px)
+       plus padding, so no width is parked as dead space beside it — the
+       scatter takes the remainder. */
+    #month-panel {
+      flex: 0 0 auto;
+      width: 300px;
+      padding: 12px 16px 8px;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+      position: relative;
+    }
+
+    #month-title {
+      font-family:'JetBrains Mono',monospace; font-size:0.55rem;
+      letter-spacing:0.08em; text-transform:uppercase; color:#cc0000;
+      margin-bottom: 8px;
+      display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+      white-space: nowrap;
+    }
+    /* Totals wear a text token, not a ramp colour — ramp ink is data ink. */
+    #month-total { color:#5e3f3a; letter-spacing:0.08em; flex-shrink:0; }
+
+    /* Centred so a repository spanning one year does not leave its single row
+       stranded at the top of the panel. */
+    #month-grid-wrap {
+      flex: 1; min-height: 0; overflow: hidden;
+      display: flex; flex-direction: column; justify-content: center;
+    }
+
+    /* Column headings: month initials, deliberately recessive. */
+    /* Fixed 16px cells rather than 1fr: the row count varies with the history
+       length, and fluid cells made a six-year repository overflow the strip
+       and silently lose its most recent year off the bottom. */
+    .mg-months {
+      display: grid;
+      grid-template-columns: 24px repeat(12, 18px);
+      gap: 2px;
+      margin-bottom: 2px;
+    }
+    .mg-month-label {
+      font-family:'JetBrains Mono',monospace; font-size:0.5rem;
+      color:#5e3f3a; text-align:center; letter-spacing:0.04em;
+      user-select: none;
+    }
+
+    .mg-row {
+      display: grid;
+      grid-template-columns: 24px repeat(12, 18px);
+      gap: 2px;
+      margin-bottom: 2px;
+    }
+    .mg-year-label {
+      font-family:'JetBrains Mono',monospace; font-size:0.5rem;
+      color:#a1a1a1; letter-spacing:0.04em;
+      display: flex; align-items: center;
+      user-select: none;
+    }
+
+    /* 18px, not the ~11px a contributions graph uses: these are pointer and
+       keyboard targets. A tiled grid has no dead space to expand a hit area
+       into — the pointer always lands on some cell — so the target is the cell
+       itself, and it is sized generously rather than to convention. */
+    .mg-cell {
+      width: 18px; height: 18px;
+      background: #1c1c1c;              /* zero: recedes toward the surface */
+      border: 1px solid transparent;
+      padding: 0;
+      cursor: default;
+      /* The cell is the hit target; it lifts on hover and on keyboard focus. */
+      transition: outline-color 90ms cubic-bezier(0.2,0.6,0.2,1);
+      outline: 1px solid transparent;
+      outline-offset: 0;
+    }
+    .mg-cell[data-level="0"] { cursor: default; }
+    .mg-cell:not([data-level="0"]) { cursor: pointer; }
+    .mg-cell:hover,
+    .mg-cell:focus-visible {
+      outline-color: #e5e2e1;
+    }
+    /* Months outside the analysed range read as absent, not as zero. */
+    .mg-cell.mg-void { background: transparent; border-color: #1c1c1c; }
+
+    /* Legend — the sequential ramp, GitHub's LESS→MORE convention. */
+    #month-legend {
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 8px;
+      font-family:'JetBrains Mono',monospace; font-size:0.5rem;
+      letter-spacing:0.1em; text-transform:uppercase; color:#5e3f3a;
+    }
+    #month-legend .lg-swatch {
+      width: 9px; height: 9px; flex-shrink: 0;
+      border: 1px solid transparent;
+    }
+    #month-legend .lg-spacer { flex: 1; }
+
+    #month-empty {
+      flex: 1; display: flex; align-items: center; justify-content: center;
+      font-family:'JetBrains Mono',monospace; font-size:0.6rem;
+      letter-spacing:0.08em; color:#5e3f3a; text-align: center;
+    }
+
+    /* Shared tooltip for the grid cells. */
+    #mg-tip {
+      position: absolute;
+      pointer-events: none;
+      z-index: 40;
+      display: none;
+      background: #0e0e0e;
+      border: 1px solid #262626;
+      padding: 5px 8px;
+      font-family:'JetBrains Mono',monospace;
+      font-size: 0.55rem;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+      color: #a1a1a1;
+    }
+    /* Value leads, label follows. */
+    #mg-tip .tip-value { color:#e5e2e1; font-weight:700; }
     #d3-title {
       font-family:'JetBrains Mono',monospace; font-size:0.55rem;
       letter-spacing:0.12em; text-transform:uppercase; color:#cc0000;
@@ -339,11 +488,15 @@ const statusColor = (s: Decision['status']) =>
       letter-spacing:0.01em; padding: 0 12px 6px; line-height: 1.2; margin: 0;
     }
 
+    /* LLM-written summaries run considerably longer than the seed copy this
+       was sized for, and the clamp alone let a third line bleed past the card
+       edge. An explicit max-height matching the clamp guarantees a clean cut. */
     .dc-summary {
       font-family:'Karla',sans-serif; font-size:0.8125rem; color:#a1a1a1;
       line-height:1.45; padding: 0 12px 10px;
-      display: -webkit-box; -webkit-line-clamp: 2;
+      display: -webkit-box; -webkit-line-clamp: 3;
       -webkit-box-orient: vertical; overflow: hidden;
+      max-height: calc(1.45em * 3 + 10px);
     }
 
     .dc-footer {
@@ -528,77 +681,64 @@ const statusColor = (s: Decision['status']) =>
 
     <!-- ── SIDEBAR ───────────────────────────────────────── -->
     <aside id="sidebar" aria-label="Navigation">
-      <nav class="sidebar-nav">
+      <nav class="sidebar-nav" aria-label="Analysis sections">
 
-        <a href="#" class="nav-item active" aria-current="page" aria-label="Decisions — current page">
+        <a class="nav-item" href={`/repo/${id}`} aria-label="Terminal">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <rect x="0" y="0" width="10" height="10" stroke="currentColor" stroke-width="1" fill="none"/>
-            <polyline points="2,5 4,7 8,3" stroke="currentColor" stroke-width="1" fill="none"/>
-          </svg>
-          DECISIONS
-        </a>
-
-        <a href={`/repo/${id}`} class="nav-item" aria-label="Terminal">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <rect x="0" y="0" width="10" height="10" stroke="currentColor" stroke-width="1" fill="none"/>
-            <polyline points="2,4 4,5 2,6" stroke="currentColor" stroke-width="1" fill="none"/>
-            <line x1="5" y1="7" x2="8" y2="7" stroke="currentColor" stroke-width="1"/>
+            <path d="M2 3l3 2-3 2" stroke="currentColor" stroke-width="1.2" fill="none"/>
+            <line x1="6" y1="7" x2="8" y2="7" stroke="currentColor" stroke-width="1.2"/>
           </svg>
           TERMINAL
         </a>
 
-        <a href={`/repo/${id}`} class="nav-item" aria-label="Uplink">
+        <a class="nav-item active" href={`/repo/${id}/decisions`} aria-label="Decisions" aria-current="page">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <line x1="5" y1="1" x2="5" y2="7" stroke="currentColor" stroke-width="1"/>
-            <polyline points="2,4 5,1 8,4" stroke="currentColor" stroke-width="1" fill="none"/>
-            <line x1="1" y1="9" x2="9" y2="9" stroke="currentColor" stroke-width="1"/>
+            <path d="M2 5l2 2 4-4" stroke="currentColor" stroke-width="1.2" fill="none"/>
           </svg>
-          UPLINK
+          DECISIONS
         </a>
 
-        <a href={`/repo/${id}/rejections`} class="nav-item" aria-label="Archive">
+        <a class="nav-item" href={`/repo/${id}/debates`} aria-label="Debates">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <rect x="0" y="3" width="10" height="7" stroke="currentColor" stroke-width="1" fill="none"/>
-            <rect x="0" y="0" width="10" height="3" stroke="currentColor" stroke-width="1" fill="none"/>
-            <line x1="3.5" y1="6" x2="6.5" y2="6" stroke="currentColor" stroke-width="1"/>
+            <rect x="1" y="2" width="5" height="4" stroke="currentColor" stroke-width="1" fill="none"/>
+            <path d="M4 6v1.5l2.5-1.5H9V4H7" stroke="currentColor" stroke-width="1" fill="none"/>
           </svg>
-          ARCHIVE
+          DEBATES
         </a>
 
-        <a href="#" class="nav-item" aria-label="Sensors">
+        <a class="nav-item" href={`/repo/${id}/rejections`} aria-label="Rejections">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <circle cx="5" cy="5" r="1.5" stroke="currentColor" stroke-width="1"/>
-            <path d="M2.5 2.5 C1 3.5 1 6.5 2.5 7.5" stroke="currentColor" stroke-width="1" fill="none"/>
-            <path d="M7.5 2.5 C9 3.5 9 6.5 7.5 7.5" stroke="currentColor" stroke-width="1" fill="none"/>
+            <line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" stroke-width="1.2"/>
+            <line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" stroke-width="1.2"/>
           </svg>
-          SENSORS
+          REJECTIONS
         </a>
 
-        <a href={`/repo/${id}/debates`} class="nav-item" aria-label="Decrypt">
+        <a class="nav-item" href={`/repo/${id}/contributors`} aria-label="Contributors">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <rect x="2" y="4" width="6" height="5" stroke="currentColor" stroke-width="1" fill="none"/>
-            <path d="M3,4 L3,3 C3,1.3 7,1.3 7,3 L7,4" stroke="currentColor" stroke-width="1" fill="none"/>
+            <circle cx="3.5" cy="3" r="1.5" stroke="currentColor" stroke-width="1"/>
+            <path d="M1 8.5c0-1.5 1-2.5 2.5-2.5s2.5 1 2.5 2.5" stroke="currentColor" stroke-width="1" fill="none"/>
+            <circle cx="7" cy="3" r="1.5" stroke="currentColor" stroke-width="1"/>
+            <path d="M5.5 8.5c0-1.5 1-2.5 2.5-2.5s2.5 1 2.5 2.5" stroke="currentColor" stroke-width="1" fill="none"/>
           </svg>
-          DECRYPT
+          CONTRIBUTORS
         </a>
 
-        <a href="#" class="nav-item" aria-label="System">
+        <a class="nav-item" href={`/repo/${id}/summary`} aria-label="Summary">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <circle cx="5" cy="5" r="2" stroke="currentColor" stroke-width="1"/>
-            <path d="M5 1v1M5 8v1M1 5h1M8 5h1" stroke="currentColor" stroke-width="1"/>
+            <rect x="2" y="1" width="6" height="8" stroke="currentColor" stroke-width="1" fill="none"/>
+            <line x1="3.5" y1="3.5" x2="6.5" y2="3.5" stroke="currentColor" stroke-width="1"/>
+            <line x1="3.5" y1="5.5" x2="6.5" y2="5.5" stroke="currentColor" stroke-width="1"/>
           </svg>
-          SYSTEM
+          SUMMARY
         </a>
 
-        <span class="sidebar-spacer"></span>
-
-        <a href="/" class="nav-item nav-item-logout" aria-label="Logout">
+        <a href="/" class="nav-item nav-item-logout" aria-label="New analysis">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <path d="M4 2H1V9H4" stroke="currentColor" stroke-width="1" fill="none"/>
-            <line x1="5" y1="5" x2="10" y2="5" stroke="currentColor" stroke-width="1"/>
-            <polyline points="8,3 10,5 8,7" stroke="currentColor" stroke-width="1" fill="none"/>
+            <path d="M5 1v5" stroke="currentColor" stroke-width="1.2"/>
+            <path d="M2.5 3.2a3.5 3.5 0 105 0" stroke="currentColor" stroke-width="1.2" fill="none"/>
           </svg>
-          LOGOUT
+          NEW_ANALYSIS
         </a>
 
       </nav>
@@ -648,10 +788,35 @@ const statusColor = (s: Decision['status']) =>
 
         <!-- ── TIMELINE ──────────────────────────────────── -->
         <section id="timeline-col" aria-label="Decision timeline">
-          <!-- D3 chronological timeline -->
-          <div id="d3-panel">
-            <div id="d3-title">CHRONOLOGICAL_DECISION_TIMELINE — TIME × CONFIDENCE</div>
-            <div id="d3-chart" aria-label="Decision chronology scatter chart"></div>
+          <!-- Chronology scatter + per-month density grid -->
+          <div id="chart-strip">
+            <div id="d3-panel">
+              <div id="d3-title">CHRONOLOGICAL_DECISION_TIMELINE — TIME × CONFIDENCE</div>
+              <div id="d3-chart" aria-label="Decision chronology scatter chart"></div>
+            </div>
+
+            <div id="month-panel">
+              <div id="month-title">
+                <span>DECISION_DENSITY — PER_MONTH</span>
+                <span id="month-total">—</span>
+              </div>
+              <!-- Built by renderMonthGrid(); every count it shows is also in
+                   the decision list below, so the grid enhances and never gates. -->
+              <div id="month-grid-wrap" role="img" aria-label="Decision density per month">
+                <div id="month-empty">AWAITING_ANALYSIS_DATA</div>
+              </div>
+              <div id="month-legend" aria-hidden="true">
+                <span>Less</span>
+                <span class="lg-swatch" style="background:#1c1c1c;"></span>
+                <span class="lg-swatch" style="background:#6a4741;"></span>
+                <span class="lg-swatch" style="background:#cc0000;"></span>
+                <span class="lg-swatch" style="background:#f4735c;"></span>
+                <span class="lg-swatch" style="background:#ffb4a8;"></span>
+                <span>More</span>
+                <span class="lg-spacer"></span>
+              </div>
+              <div id="mg-tip" role="status" aria-live="polite"></div>
+            </div>
           </div>
 
           <!-- Scrollable decision list -->
@@ -702,21 +867,21 @@ const statusColor = (s: Decision['status']) =>
           <div class="intel-section">
             <span class="intel-section-label">DECISION_STATS</span>
             <div class="stats-grid">
-              <div class="stat-cell" aria-label={`Total decisions: ${stats.total}`}>
+              <div class="stat-cell">
                 <span class="stat-cell-label">TOTAL</span>
-                <span class="stat-cell-value">{stats.total}</span>
+                <span class="stat-cell-value" id="stat-total">{seedStats ? seedStats.total : '—'}</span>
               </div>
-              <div class="stat-cell" aria-label={`Average confidence: ${stats.avgConf}%`}>
+              <div class="stat-cell">
                 <span class="stat-cell-label">AVG CONFIDENCE</span>
-                <span class="stat-cell-value">{stats.avgConf}%</span>
+                <span class="stat-cell-value" id="stat-conf">{seedStats ? `${seedStats.avgConf}%` : '—'}</span>
               </div>
-              <div class="stat-cell" aria-label={`Contributors: ${stats.contributors}`}>
+              <div class="stat-cell">
                 <span class="stat-cell-label">CONTRIBUTORS</span>
-                <span class="stat-cell-value">{stats.contributors}</span>
+                <span class="stat-cell-value" id="stat-contribs">{seedStats ? seedStats.contributors : '—'}</span>
               </div>
-              <div class="stat-cell" aria-label={`Time span: ${stats.timeSpanDays} days`}>
+              <div class="stat-cell">
                 <span class="stat-cell-label">TIME SPAN</span>
-                <span class="stat-cell-value" style="font-size:1rem;">{stats.timeSpanDays} <span style="font-size:0.75rem;font-weight:400;">days</span></span>
+                <span class="stat-cell-value" id="stat-span" style="font-size:1rem;">{seedStats ? `${seedStats.timeSpanDays} days` : '—'}</span>
               </div>
             </div>
           </div>
@@ -724,31 +889,37 @@ const statusColor = (s: Decision['status']) =>
           <!-- Confidence distribution -->
           <div class="intel-section">
             <span class="intel-section-label">CONFIDENCE_DISTRIBUTION</span>
-            {confBuckets.map((b) => (
-              <div class="conf-bar-row" aria-label={`${b.label}: ${b.pct}%`}>
-                <span class="conf-bar-label">{b.label}</span>
-                <div class="conf-bar-track" aria-hidden="true">
-                  <div class="conf-bar-fill" style={`width:${b.pct}%`}></div>
+            <div id="conf-dist">
+              {(seedBuckets.length ? seedBuckets : BUCKET_LABELS.map(label => ({ label, pct: null }))).map((b) => (
+                <div class="conf-bar-row" data-bucket={b.label}>
+                  <span class="conf-bar-label">{b.label}</span>
+                  <div class="conf-bar-track" aria-hidden="true">
+                    <div class="conf-bar-fill" style={`width:${b.pct ?? 0}%`}></div>
+                  </div>
+                  <span class="conf-bar-pct">{b.pct === null ? '—' : `${b.pct}%`}</span>
                 </div>
-                <span class="conf-bar-pct">{b.pct}%</span>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
 
           <!-- Top decision makers -->
           <div class="intel-section">
             <span class="intel-section-label">TOP_DECISION_MAKERS</span>
-            {topMakers.map((m) => (
-              <div class="maker-row" aria-label={`${m.handle}: ${m.count} decisions`}>
-                <div class="maker-header">
-                  <span class="maker-handle">@{m.handle}</span>
-                  <span class="maker-count">{m.count} decisions</span>
+            <div id="top-makers">
+              {seedTopMakers.length ? seedTopMakers.map((m) => (
+                <div class="maker-row">
+                  <div class="maker-header">
+                    <span class="maker-handle">@{m.handle}</span>
+                    <span class="maker-count">{m.count} decisions</span>
+                  </div>
+                  <div class="maker-bar-track" aria-hidden="true">
+                    <div class="maker-bar-fill" style={`width:${m.pct}%`}></div>
+                  </div>
                 </div>
-                <div class="maker-bar-track" aria-hidden="true">
-                  <div class="maker-bar-fill" style={`width:${m.pct}%`}></div>
-                </div>
-              </div>
-            ))}
+              )) : (
+                <div class="maker-row"><span class="maker-count">AWAITING_ANALYSIS_DATA</span></div>
+              )}
+            </div>
           </div>
 
         </aside>
@@ -762,22 +933,28 @@ const statusColor = (s: Decision['status']) =>
               <span class="stream-sep">//</span>
               INDEXED
             </div>
-            <span class="stream-header-right">TOTAL: <span id="stream-total">{decisions.length}</span></span>
+            <span class="stream-header-right">TOTAL: <span id="stream-total">{IS_UUID ? '—' : decisions.length}</span></span>
           </div>
           <div id="stream-body" role="log" aria-label="Decision stream" aria-live="polite">
-            <div class="s-line"><span class="s-tag-sys">[SYSTEM]</span><span class="s-tag"> BOOT_SEQUENCE: INITIALIZING DECISION_ENGINE_V4...</span></div>
-            <div class="s-line"><span class="s-tag">[AUTH]</span><span class="s-tag"> SESSION_TOKEN: VALIDATED for USER_OPERATOR</span></div>
-            <div class="s-line"><span class="s-tag">[FETCH]</span><span class="s-tag"> INDEXING REMOTE_LEDGER: decisions endpoint</span></div>
-            <div class="s-line"><span class="s-tag">[INDEX]</span><span class="s-em"> SUCCESS: {decisions.length} ENTRIES PARSED FROM COMMIT_LOG</span></div>
-            {decisions.slice(0, 4).map((d) => (
-              <div class="s-line">
-                <span class="s-tag">[LOG]</span>
-                <span class="s-tag"> PARSING </span>
-                <span class="s-em">DECISION_{String(d.index).padStart(2,'0')}: {d.title}</span>
-                <span class="s-tag"> ({d.sha})</span>
-              </div>
-            ))}
-            <div class="s-line s-pulse"><span class="s-tag">[LISTENING]</span><span class="s-tag"> AWAITING REAL-TIME ARCHITECTURAL EVENTS...</span></div>
+            {IS_UUID ? (
+              <div class="s-line"><span class="s-tag-sys">[SYSTEM]</span><span class="s-tag"> Connecting to analysis service…</span></div>
+            ) : (
+              <Fragment>
+                <div class="s-line"><span class="s-tag-sys">[SYSTEM]</span><span class="s-tag"> BOOT_SEQUENCE: INITIALIZING DECISION_ENGINE_V4...</span></div>
+                <div class="s-line"><span class="s-tag">[AUTH]</span><span class="s-tag"> SESSION_TOKEN: VALIDATED for USER_OPERATOR</span></div>
+                <div class="s-line"><span class="s-tag">[FETCH]</span><span class="s-tag"> INDEXING REMOTE_LEDGER: decisions endpoint</span></div>
+                <div class="s-line"><span class="s-tag">[INDEX]</span><span class="s-em"> SUCCESS: {decisions.length} ENTRIES PARSED FROM COMMIT_LOG</span></div>
+                {decisions.slice(0, 4).map((d) => (
+                  <div class="s-line">
+                    <span class="s-tag">[LOG]</span>
+                    <span class="s-tag"> PARSING </span>
+                    <span class="s-em">DECISION_{String(d.index).padStart(2,'0')}: {d.title}</span>
+                    <span class="s-tag"> ({d.sha})</span>
+                  </div>
+                ))}
+                <div class="s-line s-pulse"><span class="s-tag">[LISTENING]</span><span class="s-tag"> AWAITING REAL-TIME ARCHITECTURAL EVENTS...</span></div>
+              </Fragment>
+            )}
           </div>
         </section>
 
@@ -788,9 +965,18 @@ const statusColor = (s: Decision['status']) =>
   <!-- ════════════════════════════════════════════════════════
        SCRIPTS
   ═════════════════════════════════════════════════════════ -->
-  <script define:vars={{ seedDecisions: decisions }}>
+  <!-- Seed payload for the demo (slug) view. Passed as JSON rather than via
+       define:vars: define:vars forces the script inline, which stops Astro
+       bundling it — the ES imports below then throw
+       "Cannot use import statement outside a module" and kill all hydration. -->
+  <script type="application/json" id="glyph-seed" set:html={JSON.stringify({ seedDecisions: decisions })}></script>
+
+  <script>
     import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed } from '../../../scripts/repo-view';
-    import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
+    import * as d3 from 'd3';
+
+    const seedEl = document.getElementById('glyph-seed');
+    const { seedDecisions } = JSON.parse(seedEl?.textContent || '{"seedDecisions":[]}');
     const API_BASE = apiBase();
 
     // ── D3 chronological timeline ─────────────────────────
@@ -854,7 +1040,18 @@ const statusColor = (s: Decision['status']) =>
       // Axes
       const xg = svg.append('g')
         .attr('transform', `translate(0,${H - M.bottom})`)
-        .call(d3.axisBottom(x).ticks(6).tickFormat(d3.timeFormat('%b %y') as any));
+        // Span-aware ticks. '%b %y' alone renders "Jan 22", which reads as a
+        // day-of-month; real decision histories span years, so pick a format
+        // that matches the range actually being shown.
+        .call(
+          d3.axisBottom(x).ticks(6).tickFormat(((v: any) => {
+            const [a, b] = x.domain() as [Date, Date];
+            const days = Math.abs(+b - +a) / 86400000;
+            if (days > 730) return d3.timeFormat('%Y')(v);
+            if (days > 60)  return d3.timeFormat("%b '%y")(v);
+            return d3.timeFormat('%d %b')(v);
+          }) as any)
+        );
       xg.selectAll('text').attr('fill', '#a1a1a1').style('font-size', '9px');
       xg.selectAll('path,line').attr('stroke', '#2a2a2a');
 
@@ -918,6 +1115,178 @@ const statusColor = (s: Decision['status']) =>
         .on('mouseleave', () => tip.style('display', 'none'));
     }
 
+    // ── Per-month decision density grid ───────────────────
+    // A GitHub-contributions-style matrix: one row per year, one cell per
+    // month, cell colour encoding how many decisions landed that month.
+    // Sequential encoding on a single hue drawn from GLYPH's own tokens —
+    // dim rust → #cc0000 → coral → #ffb4a8 — validated as an ordinal ramp
+    // against the #131313 surface (monotone lightness, adjacent ΔL ≥ 0.06,
+    // dim end ≥ 2:1, hue spread 3°).
+    const MG_RAMP = ['#6a4741', '#cc0000', '#f4735c', '#ffb4a8'];
+    const MG_ZERO = '#1c1c1c';
+    const MG_MONTHS = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+    const MG_MONTH_NAMES = ['January','February','March','April','May','June',
+                            'July','August','September','October','November','December'];
+
+    /** Map a count onto a ramp step.
+     *  Decision histories are sparse — a busy month is often only three or four
+     *  nodes — so below that, count maps to step directly and every increment is
+     *  visible. Pure quartiles would collapse 1 and 2 into the same colour and
+     *  never use the dim step at all. Above it, quartiles keep the scale bounded. */
+    function mgLevel(count, max) {
+      if (count <= 0) return 0;
+      if (max <= 4) return Math.min(count, 4);
+      const q = count / max;
+      if (q <= 0.25) return 1;
+      if (q <= 0.5)  return 2;
+      if (q <= 0.75) return 3;
+      return 4;
+    }
+
+    function renderMonthGrid(items) {
+      const wrap  = document.getElementById('month-grid-wrap');
+      const total = document.getElementById('month-total');
+      const tip   = document.getElementById('mg-tip');
+      const panel = document.getElementById('month-panel');
+      if (!wrap) return;
+
+      // Bucket by calendar month. Undated insights are excluded from the grid
+      // but still counted in the list below, so the header says how many.
+      const buckets = new Map();          // "YYYY-M" -> count
+      let dated = 0;
+      let minY = Infinity, maxY = -Infinity;
+
+      items.forEach((d) => {
+        const raw = d.timestamp;
+        if (!raw) return;
+        const t = new Date(raw);
+        if (Number.isNaN(+t)) return;
+        dated++;
+        const y = t.getFullYear();
+        const m = t.getMonth();
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+        const key = `${y}-${m}`;
+        buckets.set(key, (buckets.get(key) ?? 0) + 1);
+      });
+
+      if (!dated) {
+        wrap.innerHTML = '';
+        const msg = document.createElement('div');
+        msg.id = 'month-empty';
+        msg.textContent = items.length
+          ? 'NO_DATED_DECISIONS'
+          : 'NO_DECISIONS_EXTRACTED';
+        wrap.appendChild(msg);
+        if (total) total.textContent = '—';
+        return;
+      }
+
+      const max = Math.max(...buckets.values());
+      if (total) {
+        total.textContent = dated === items.length
+          ? `${dated} DATED`
+          : `${dated}/${items.length} DATED`;
+      }
+
+      // Bound the row count so a decade-long history stays legible in the strip.
+      const MAX_ROWS = 7;
+      if (maxY - minY + 1 > MAX_ROWS) minY = maxY - (MAX_ROWS - 1);
+
+      wrap.innerHTML = '';
+
+      // Month headings
+      const head = document.createElement('div');
+      head.className = 'mg-months';
+      head.appendChild(document.createElement('span'));       // year-label gutter
+      MG_MONTHS.forEach((label) => {
+        const el = document.createElement('span');
+        el.className = 'mg-month-label';
+        el.textContent = label;
+        head.appendChild(el);
+      });
+      wrap.appendChild(head);
+
+      const now = new Date();
+      const showTip = (el, text) => {
+        if (!tip || !panel) return;
+        tip.textContent = '';
+        const strong = document.createElement('span');
+        strong.className = 'tip-value';
+        strong.textContent = text.value;              // value leads
+        const rest = document.createElement('span');
+        rest.textContent = ` ${text.label}`;          // label follows
+        tip.appendChild(strong);
+        tip.appendChild(rest);
+        tip.style.display = 'block';
+
+        const pr = panel.getBoundingClientRect();
+        const cr = el.getBoundingClientRect();
+        const left = cr.left - pr.left + cr.width / 2 - tip.offsetWidth / 2;
+        tip.style.left = `${Math.max(4, Math.min(left, pr.width - tip.offsetWidth - 4))}px`;
+        tip.style.top  = `${cr.top - pr.top - tip.offsetHeight - 6}px`;
+      };
+      const hideTip = () => { if (tip) tip.style.display = 'none'; };
+
+      for (let y = minY; y <= maxY; y++) {
+        const row = document.createElement('div');
+        row.className = 'mg-row';
+
+        const yl = document.createElement('span');
+        yl.className = 'mg-year-label';
+        yl.textContent = `'${String(y).slice(2)}`;    // '22, '23 …
+        row.appendChild(yl);
+
+        for (let m = 0; m < 12; m++) {
+          const count = buckets.get(`${y}-${m}`) ?? 0;
+          const level = mgLevel(count, max);
+
+          // A month that has not happened yet is absent, not empty.
+          const future = y > now.getFullYear()
+            || (y === now.getFullYear() && m > now.getMonth());
+
+          const cell = document.createElement('button');
+          cell.type = 'button';
+          cell.className = 'mg-cell' + (future ? ' mg-void' : '');
+          cell.dataset.level = String(level);
+          if (!future) cell.style.background = level === 0 ? MG_ZERO : MG_RAMP[level - 1];
+
+          const label = `${MG_MONTH_NAMES[m]} ${y}`;
+          if (future) {
+            cell.disabled = true;
+            cell.setAttribute('aria-hidden', 'true');
+            cell.tabIndex = -1;
+          } else {
+            // Reachable without hovering, for screen readers and for the
+            // keyboard path the tooltip mirrors.
+            const noun = count === 1 ? 'decision' : 'decisions';
+            cell.setAttribute('aria-label', `${count} ${noun} in ${label}`);
+            const payload = { value: `${count} ${noun.toUpperCase()}`, label: `· ${label}` };
+            cell.addEventListener('pointerenter', () => showTip(cell, payload));
+            cell.addEventListener('pointermove',  () => showTip(cell, payload));
+            cell.addEventListener('pointerleave', hideTip);
+            cell.addEventListener('focus',        () => showTip(cell, payload));
+            cell.addEventListener('blur',         hideTip);
+          }
+          row.appendChild(cell);
+        }
+        wrap.appendChild(row);
+      }
+    }
+
+    /// Reduce a source reference to something worth showing next to COMMIT:
+    /// a 7-char SHA when one is present, else a PR/issue number, else the
+    /// trimmed reference itself.
+    function shortRef(ref) {
+      if (!ref) return 'N/A';
+      const text = String(ref).trim();
+      const sha = text.match(/[0-9a-f]{7,40}/i);
+      if (sha) return sha[0].slice(0, 7).toLowerCase();
+      const num = text.match(/#?(\d+)/);
+      if (num) return '#' + num[1];
+      return text.length > 12 ? text.slice(0, 12) + '…' : text;
+    }
+
     // ── Hydrate from real API ─────────────────────────────
     (function hydrateDecisions() {
       const jobId = getJobId();
@@ -932,6 +1301,16 @@ const statusColor = (s: Decision['status']) =>
             // Honest empty state — this job produced no decision nodes.
             showEmptyState(list, 'NO_DECISIONS_EXTRACTED',
               'This analysis produced no decision nodes for this repository.');
+            // The D3 scatter has nothing to plot; say so rather than
+            // leaving an empty chart frame that reads as "still loading".
+            const chart = document.getElementById('d3-chart');
+            if (chart) {
+              chart.innerHTML =
+                '<div style="display:flex;align-items:center;justify-content:center;height:100%;' +
+                'font-family:JetBrains Mono,monospace;font-size:0.625rem;letter-spacing:0.08em;' +
+                'color:#5e3f3a;">NO_TIMELINE_DATA</div>';
+            }
+            renderMonthGrid([]);
             return;
           }
           if (!list) return;
@@ -941,7 +1320,10 @@ const statusColor = (s: Decision['status']) =>
             const title   = (d.title ?? 'UNKNOWN').toUpperCase().replace(/\s+/g, '_');
             const summary = d.summary ?? '';
             const ref     = Array.isArray(d.source_refs) ? d.source_refs[0] : undefined;
-            const sha     = ref ? String(ref).slice(0, 7) : 'N/A';
+            // Refs arrive loosely formatted — "a1b2c3d", "commit: a1b2c3d",
+            // "PR #1822". Blindly taking the first 7 characters rendered
+            // "COMMIT: commit:", so pull out the actual identifier.
+            const sha     = shortRef(ref);
             const conf    = Math.round((d.confidence ?? 0) * 100);
             const contrib = Array.isArray(d.contributors) ? d.contributors[0] ?? 'unknown' : 'unknown';
             const ts      = (d.timestamp ?? '').replace('T', ' ').replace('Z', '');
@@ -983,6 +1365,11 @@ const statusColor = (s: Decision['status']) =>
 
           // Real decisions on the chronological scatter.
           renderTimeline(data.decisions);
+
+          // Intelligence sidebar — every number below is derived from the
+          // decision nodes the backend actually returned.
+          hydrateStats(data.decisions);
+          renderMonthGrid(data.decisions);
         })
         .catch(() => {
           const body = document.getElementById('stream-body');
@@ -990,9 +1377,89 @@ const statusColor = (s: Decision['status']) =>
         });
     })();
 
+    // ── Intelligence sidebar hydration (real jobs only) ───
+    // Recomputes TOTAL / AVG CONFIDENCE / CONTRIBUTORS / TIME SPAN, the
+    // confidence histogram and the top decision makers straight from the
+    // API payload. Nothing here can fall back to seed values.
+    function hydrateStats(items) {
+      const set = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+      };
+
+      const confs = items.map(d => Math.round((d.confidence ?? 0) * 100));
+      const avg   = confs.length
+        ? Math.round(confs.reduce((a, c) => a + c, 0) / confs.length)
+        : 0;
+
+      const people = new Set();
+      items.forEach(d => {
+        (Array.isArray(d.contributors) ? d.contributors : []).forEach(c => {
+          if (c) people.add(String(c));
+        });
+      });
+
+      const times = items
+        .map(d => Date.parse(d.timestamp ?? ''))
+        .filter(t => !Number.isNaN(t));
+      const spanDays = times.length >= 2
+        ? Math.max(1, Math.round((Math.max(...times) - Math.min(...times)) / 86400000))
+        : null;
+
+      set('stat-total',    String(items.length));
+      set('stat-conf',     `${avg}%`);
+      set('stat-contribs', String(people.size));
+      set('stat-span',     spanDays === null ? 'N/A' : `${spanDays} days`);
+
+      // Confidence histogram — same four buckets, real counts.
+      const buckets = [
+        ['HIGH (90%+)',    confs.filter(c => c >= 90).length],
+        ['MED (70–89%)',   confs.filter(c => c >= 70 && c < 90).length],
+        ['LOW (50–69%)',   confs.filter(c => c >= 50 && c < 70).length],
+        ['MINIMAL (<50%)', confs.filter(c => c < 50).length],
+      ];
+      buckets.forEach(([label, count]) => {
+        const row = document.querySelector(`.conf-bar-row[data-bucket="${label}"]`);
+        if (!row) return;
+        const pct = confs.length ? Math.round(count / confs.length * 100) : 0;
+        const fill = row.querySelector('.conf-bar-fill');
+        const out  = row.querySelector('.conf-bar-pct');
+        if (fill) fill.style.width = pct + '%';
+        if (out)  out.textContent  = pct + '%';
+      });
+
+      // Top decision makers — real handles, real counts.
+      const tally = {};
+      items.forEach(d => {
+        const c = Array.isArray(d.contributors) ? d.contributors[0] : null;
+        if (c) tally[c] = (tally[c] ?? 0) + 1;
+      });
+      const ranked = Object.entries(tally).sort((a, b) => b[1] - a[1]).slice(0, 3);
+      const host = document.getElementById('top-makers');
+      if (!host) return;
+      if (!ranked.length) {
+        host.innerHTML =
+          '<div class="maker-row"><span class="maker-count">NO_CONTRIBUTOR_ATTRIBUTION</span></div>';
+        return;
+      }
+      host.innerHTML = ranked.map(([handle, count]) => {
+        const pct = Math.round(count / items.length * 100);
+        return `<div class="maker-row">
+            <div class="maker-header">
+              <span class="maker-handle">@${handle}</span>
+              <span class="maker-count">${count} decision${count === 1 ? '' : 's'}</span>
+            </div>
+            <div class="maker-bar-track" aria-hidden="true">
+              <div class="maker-bar-fill" style="width:${pct}%"></div>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
     // ── Demo (slug) timeline from seed data ───────────────
     if (!getJobId()) {
       renderTimeline(seedDecisions);
+      renderMonthGrid(seedDecisions);
     }
 
     // ── Execute fetch ─────────────────────────────────────
@@ -1011,8 +1478,10 @@ const statusColor = (s: Decision['status']) =>
       if (!body) return;
 
       // Real jobs stream the actual analysis stage; only slug/demo URLs
-      // (getJobId() === null) get the fabricated boot sequence.
+      // (getJobId() === null) get the fabricated boot sequence. Wipe the
+      // server-rendered placeholder line first so nothing seeded survives.
       if (getJobId()) {
+        body.innerHTML = '';
         startStatusFeed(body);
         return;
       }

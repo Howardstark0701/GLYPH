@@ -40,7 +40,14 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <style>
+  <!-- is:global is required, not cosmetic. Astro scopes page CSS with a
+       [data-astro-cid-*] attribute that only server-rendered markup carries.
+       Every element these pages build in JS (live-feed lines, hydrated
+       decision/contributor cards, D3 nodes) is created with innerHTML or
+       document.createElement and therefore has no scope attribute — under
+       scoped CSS it renders completely unstyled. This page's stylesheet is
+       self-contained and loaded by this page alone, so going global is safe. -->
+  <style is:global>
     /* ── Reset ────────────────────────────────────────────── */
     *, *::before, *::after {
       box-sizing: border-box;
@@ -179,7 +186,9 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
       top: 48px;
       left: 0; right: 0; bottom: 0;
       display: grid;
-      grid-template-columns: 172px 1fr 260px;
+      /* The stream column was 260px, which clipped every log line mid-word
+         (backend error messages carry full API URLs). Wider + wrapping. */
+      grid-template-columns: 172px minmax(0, 1fr) 320px;
     }
 
     /* ══════════════════════════════════════════════════════
@@ -521,6 +530,9 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
       display: flex;
       align-items: center;
       gap: 8px;
+      min-width: 0;
+      overflow: hidden;
+      white-space: nowrap;
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.6rem;
       letter-spacing: 0.1em;
@@ -539,6 +551,8 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
       50%       { opacity: 0.25; }
     }
     .stream-header-right {
+      flex-shrink: 0;
+      white-space: nowrap;
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.6rem;
       letter-spacing: 0.08em;
@@ -553,18 +567,25 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
       flex-direction: column;
       gap: 1px;
     }
+    /* Log lines wrap instead of being clipped: a real backend error carries
+       a full API URL and used to disappear past the panel edge. */
     .stream-line {
       font-family: 'JetBrains Mono', monospace;
       font-size: 0.6rem;
       line-height: 1.6;
       color: #a1a1a1;
       letter-spacing: 0.04em;
-      white-space: nowrap;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
     }
-    .stream-line .ln       { color: #3a3a3a; margin-right: 8px; min-width: 16px; display: inline-block; }
+    .stream-line .ln       { color: #3a3a3a; min-width: 10px; flex-shrink: 0; }
     .stream-line .ln-critical { color: #cc0000; font-weight: 700; }
-    .stream-line .ev-tr    { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; line-height: 1.6; letter-spacing: 0.04em; color: #a1a1a1; white-space: nowrap; }
-    .stream-line .ev-cr    { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; line-height: 1.6; letter-spacing: 0.04em; color: #cc0000; font-weight: 700; white-space: nowrap; }
+    .stream-line .ev-tr    { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; line-height: 1.6; letter-spacing: 0.04em; color: #a1a1a1; min-width: 0; overflow-wrap: anywhere; }
+    .stream-line .ev-cr    { font-family: 'JetBrains Mono', monospace; font-size: 0.6rem; line-height: 1.6; letter-spacing: 0.04em; color: #cc0000; font-weight: 700; min-width: 0; overflow-wrap: anywhere; }
     .stream-line .ev-kw { color: #e5e2e1; }
 
     /* Scrollbar */
@@ -851,7 +872,10 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
       <!-- Page header -->
       <header id="page-header">
         <div id="page-header-left">
-          <h1 class="page-title">SYSTEM RECONSTRUCTION: <span style="color:#cc0000;">ACTIVE</span></h1>
+          <!-- The state word tracks the real job status (see the status
+               poller below). Hardcoding "ACTIVE" made a failed job's header
+               contradict its own STATUS: FAILED readout. -->
+          <h1 class="page-title">SYSTEM RECONSTRUCTION: <span id="recon-state" style="color:#cc0000;">{IS_UUID ? 'CONNECTING' : 'ACTIVE'}</span></h1>
           <p class="page-context">THREAD CONTEXT: {repoContext}</p>
         </div>
         <div id="page-header-right">
@@ -1030,7 +1054,9 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
           <span style="color:#5e3f3a;">//</span>
           STDOUT
         </div>
-        <span class="stream-header-right">FILTER: ALL_EVENTS</span>
+        <!-- Was "FILTER: ALL_EVENTS", which implied a filter control that
+             does not exist. Name the real source of these lines instead. -->
+        <span class="stream-header-right">/status</span>
       </div>
       <div id="stream-body" role="log" aria-label="Live intelligence stream output" aria-live="polite">
         <!-- Seed lines — rendered server-side, JS appends more -->
@@ -1433,6 +1459,26 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
           var hb = document.getElementById('heartbeat-val');
           if (hb) hb.textContent = status.toUpperCase();
 
+          // Keep the page title honest: the headline state must agree with
+          // the status readout next to it.
+          var reconState = document.getElementById('recon-state');
+          if (reconState) {
+            var STATE_WORD = {
+              processing:  'ACTIVE',
+              queued:      'QUEUED',
+              complete:    'COMPLETE',
+              idle:        'COMPLETE',
+              failed:      'FAILED',
+              terminated:  'TERMINATED',
+            };
+            var word = STATE_WORD[status] || status.toUpperCase();
+            reconState.textContent = word;
+            reconState.style.color =
+              (status === 'failed' || status === 'terminated') ? '#cc0000'
+              : (status === 'complete' || status === 'idle')   ? '#22d3ee'
+              : '#cc0000';
+          }
+
           if (status !== lastStatus) {
             lastStatus = status;
             if (status === 'complete') {
@@ -1473,10 +1519,15 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
   </script>
 
   <!-- ── D3 Decision Graph ──────────────────────────────── -->
-  <script type="module">
-    import * as d3 from 'https://cdn.jsdelivr.net/npm/d3@7/+esm';
+  <script>
+    // d3 is bundled from node_modules rather than fetched from a CDN so the
+    // graph still renders with no network (offline demo / bad venue wifi).
+    import * as d3 from 'd3';
+    // apiBase() owns the environment fallback. Hardcoding localhost:8000 here
+    // made the deployed graph call the visitor's own machine and never render.
+    import { apiBase } from '../../scripts/repo-view';
 
-    const API_BASE = (import.meta as any).env?.PUBLIC_API_BASE_URL ?? 'http://localhost:8000';
+    const API_BASE = apiBase();
 
     // Extract job_id from the current URL path: /repo/:id
     const pathParts = window.location.pathname.split('/').filter(Boolean);

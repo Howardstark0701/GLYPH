@@ -129,7 +129,14 @@ const initials = (h: string) =>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <style>
+  <!-- is:global is required, not cosmetic. Astro scopes page CSS with a
+       [data-astro-cid-*] attribute that only server-rendered markup carries.
+       Every element these pages build in JS (live-feed lines, hydrated
+       decision/contributor cards, D3 nodes) is created with innerHTML or
+       document.createElement and therefore has no scope attribute — under
+       scoped CSS it renders completely unstyled. This page's stylesheet is
+       self-contained and loaded by this page alone, so going global is safe. -->
+  <style is:global>
     /* ── Reset ───────────────────────────────────────────── */
     *, *::before, *::after {
       box-sizing: border-box;
@@ -591,97 +598,64 @@ const initials = (h: string) =>
         <span class="sb-user-sub">LEVEL 07 CLEAR</span>
       </div>
 
-      <nav class="sidebar-nav" aria-label="Sections">
+      <nav class="sidebar-nav" aria-label="Analysis sections">
 
-        <a href={`/repo/${id}/decisions`} class="nav-item" aria-label="Decisions">
+        <a class="nav-item" href={`/repo/${id}`} aria-label="Terminal">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <rect x="0" y="0" width="10" height="10" stroke="currentColor" stroke-width="1" fill="none"/>
-            <polyline points="2,5 4,7 8,3" stroke="currentColor" stroke-width="1" fill="none"/>
-          </svg>
-          DECISIONS
-        </a>
-
-        <a href="#" class="nav-item active" aria-current="page" aria-label="Contributors — active">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <circle cx="3.5" cy="3" r="2" stroke="currentColor" stroke-width="1"/>
-            <circle cx="7.5" cy="3" r="2" stroke="currentColor" stroke-width="1"/>
-            <path d="M0 9c0-2 1.5-3 3.5-3s3.5 1 3.5 3" stroke="currentColor" stroke-width="1" fill="none"/>
-            <path d="M7 6.5c1.2 0 3 0.6 3 2.5" stroke="currentColor" stroke-width="1" fill="none"/>
-          </svg>
-          CONTRIBUTORS
-        </a>
-
-        <a href={`/repo/${id}`} class="nav-item" aria-label="Terminal">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <rect x="0" y="0" width="10" height="10" stroke="currentColor" stroke-width="1" fill="none"/>
-            <polyline points="2,4 4,5 2,6" stroke="currentColor" stroke-width="1" fill="none"/>
-            <line x1="5" y1="7" x2="8" y2="7" stroke="currentColor" stroke-width="1"/>
+            <path d="M2 3l3 2-3 2" stroke="currentColor" stroke-width="1.2" fill="none"/>
+            <line x1="6" y1="7" x2="8" y2="7" stroke="currentColor" stroke-width="1.2"/>
           </svg>
           TERMINAL
         </a>
 
-        <a href={`/repo/${id}`} class="nav-item" aria-label="Uplink">
+        <a class="nav-item" href={`/repo/${id}/decisions`} aria-label="Decisions">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <line x1="5" y1="1" x2="5" y2="7" stroke="currentColor" stroke-width="1"/>
-            <polyline points="2,4 5,1 8,4" stroke="currentColor" stroke-width="1" fill="none"/>
-            <line x1="1" y1="9" x2="9" y2="9" stroke="currentColor" stroke-width="1"/>
+            <path d="M2 5l2 2 4-4" stroke="currentColor" stroke-width="1.2" fill="none"/>
           </svg>
-          UPLINK
+          DECISIONS
         </a>
 
-        <a href={`/repo/${id}/rejections`} class="nav-item" aria-label="Archive">
+        <a class="nav-item" href={`/repo/${id}/debates`} aria-label="Debates">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <rect x="0" y="3" width="10" height="7" stroke="currentColor" stroke-width="1" fill="none"/>
-            <rect x="0" y="0" width="10" height="3" stroke="currentColor" stroke-width="1" fill="none"/>
-            <line x1="3.5" y1="6" x2="6.5" y2="6" stroke="currentColor" stroke-width="1"/>
+            <rect x="1" y="2" width="5" height="4" stroke="currentColor" stroke-width="1" fill="none"/>
+            <path d="M4 6v1.5l2.5-1.5H9V4H7" stroke="currentColor" stroke-width="1" fill="none"/>
           </svg>
-          ARCHIVE
+          DEBATES
         </a>
 
-        <a href="#" class="nav-item" aria-label="Sensors">
+        <a class="nav-item" href={`/repo/${id}/rejections`} aria-label="Rejections">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <circle cx="5" cy="5" r="1.5" stroke="currentColor" stroke-width="1"/>
-            <path d="M2.5 2.5 C1 3.5 1 6.5 2.5 7.5" stroke="currentColor" stroke-width="1" fill="none"/>
-            <path d="M7.5 2.5 C9 3.5 9 6.5 7.5 7.5" stroke="currentColor" stroke-width="1" fill="none"/>
+            <line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" stroke-width="1.2"/>
+            <line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" stroke-width="1.2"/>
           </svg>
-          SENSORS
+          REJECTIONS
         </a>
 
-        <a href={`/repo/${id}/debates`} class="nav-item" aria-label="Decrypt">
+        <a class="nav-item active" href={`/repo/${id}/contributors`} aria-label="Contributors" aria-current="page">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <rect x="2" y="4" width="6" height="5" stroke="currentColor" stroke-width="1" fill="none"/>
-            <path d="M3,4 L3,3 C3,1.3 7,1.3 7,3 L7,4" stroke="currentColor" stroke-width="1" fill="none"/>
+            <circle cx="3.5" cy="3" r="1.5" stroke="currentColor" stroke-width="1"/>
+            <path d="M1 8.5c0-1.5 1-2.5 2.5-2.5s2.5 1 2.5 2.5" stroke="currentColor" stroke-width="1" fill="none"/>
+            <circle cx="7" cy="3" r="1.5" stroke="currentColor" stroke-width="1"/>
+            <path d="M5.5 8.5c0-1.5 1-2.5 2.5-2.5s2.5 1 2.5 2.5" stroke="currentColor" stroke-width="1" fill="none"/>
           </svg>
-          DECRYPT
+          CONTRIBUTORS
         </a>
 
-        <a href="#" class="nav-item" aria-label="System">
+        <a class="nav-item" href={`/repo/${id}/summary`} aria-label="Summary">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <circle cx="5" cy="5" r="2" stroke="currentColor" stroke-width="1"/>
-            <path d="M5 1v1M5 8v1M1 5h1M8 5h1" stroke="currentColor" stroke-width="1"/>
+            <rect x="2" y="1" width="6" height="8" stroke="currentColor" stroke-width="1" fill="none"/>
+            <line x1="3.5" y1="3.5" x2="6.5" y2="3.5" stroke="currentColor" stroke-width="1"/>
+            <line x1="3.5" y1="5.5" x2="6.5" y2="5.5" stroke="currentColor" stroke-width="1"/>
           </svg>
-          SYSTEM
+          SUMMARY
         </a>
 
-        <span class="sidebar-spacer"></span>
-
-        <a href="#" class="nav-item nav-item-util" aria-label="Docs">
+        <a href="/" class="nav-item nav-item-logout" aria-label="New analysis">
           <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <rect x="1" y="0" width="8" height="10" stroke="currentColor" stroke-width="1" fill="none"/>
-            <line x1="3" y1="3" x2="7" y2="3" stroke="currentColor" stroke-width="0.8"/>
-            <line x1="3" y1="5" x2="7" y2="5" stroke="currentColor" stroke-width="0.8"/>
-            <line x1="3" y1="7" x2="5.5" y2="7" stroke="currentColor" stroke-width="0.8"/>
+            <path d="M5 1v5" stroke="currentColor" stroke-width="1.2"/>
+            <path d="M2.5 3.2a3.5 3.5 0 105 0" stroke="currentColor" stroke-width="1.2" fill="none"/>
           </svg>
-          DOCS
-        </a>
-
-        <a href="/" class="nav-item nav-item-util" aria-label="Logout">
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-            <path d="M4 2H1V9H4" stroke="currentColor" stroke-width="1" fill="none"/>
-            <line x1="5" y1="5" x2="10" y2="5" stroke="currentColor" stroke-width="1"/>
-            <polyline points="8,3 10,5 8,7" stroke="currentColor" stroke-width="1" fill="none"/>
-          </svg>
-          LOGOUT
+          NEW_ANALYSIS
         </a>
 
       </nav>
@@ -852,13 +826,17 @@ const initials = (h: string) =>
               ACTIVE
             </div>
             <div id="feed-actions">
-              <span class="feed-header-right" style="margin-right:12px;">PROFILES: {contributors.length}</span>
+              <span class="feed-header-right" style="margin-right:12px;">PROFILES: {IS_UUID ? '—' : contributors.length}</span>
               <button id="feed-exec-btn" type="button" aria-label="Execute fetch">EXECUTE_FETCH</button>
               <button class="feed-ghost-btn" type="button" aria-label="Export CSV">EXPORT_CSV</button>
               <button class="feed-ghost-btn" type="button" aria-label="Purge cache">PURGE_CACHE</button>
             </div>
           </div>
           <div id="feed-body" role="log" aria-label="Contributor intelligence feed" aria-live="polite">
+            {IS_UUID ? (
+              <div class="f-line"><span class="f-mute">[SYSTEM] Connecting to analysis service…</span></div>
+            ) : (
+            <Fragment>
             <div class="f-line"><span class="f-tag">[PROFILE]</span><span class="f-mute"> @arch_priya reasoning extracted: </span><span class="f-em">'PRIORITIZES_STRUCTURE'</span></div>
             <div class="f-line"><span class="f-mute">[INFLUENCE] @lead_author scored: </span><span class="f-em">74%</span><span class="f-mute"> aggregate authority</span></div>
             <div class="f-line"><span class="f-mute">[QUERY] Searching registry for 'performance' pattern matches...</span></div>
@@ -867,6 +845,8 @@ const initials = (h: string) =>
             <div class="f-line"><span style="color:#cc0000;font-weight:700;">[ALERT]</span><span class="f-mute"> Minimal debate participation detected for </span><span class="f-em">@sec_ananya</span></div>
             <div class="f-line"><span class="f-tag">[PROFILE]</span><span class="f-mute"> @analytics_reed profile updated: </span><span class="f-em">'MODERATOR_TRAIT_DETECTED'</span></div>
             <div class="f-line"><span class="f-mute">[NETWORK] Synchronizing intelligence nodes across 12 clusters...</span></div>
+            </Fragment>
+            )}
           </div>
         </section>
 
@@ -877,8 +857,15 @@ const initials = (h: string) =>
   <!-- ════════════════════════════════════════════════════════
        SCRIPTS
   ═════════════════════════════════════════════════════════ -->
-  <script define:vars={{ seedContributors: contributors }}>
+  <!-- Seed payload as JSON: define:vars forces the script inline, which stops
+       Astro bundling it and makes the ES imports below throw. -->
+  <script type="application/json" id="glyph-seed" set:html={JSON.stringify({ seedContributors: contributors })}></script>
+
+  <script>
     import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed } from '../../../scripts/repo-view';
+
+    const seedEl = document.getElementById('glyph-seed');
+    const { seedContributors } = JSON.parse(seedEl?.textContent || '{"seedContributors":[]}');
     const API_BASE = apiBase();
 
     // ── Hydrate real contributor profiles from the API ────
@@ -1057,7 +1044,9 @@ const initials = (h: string) =>
       if (!body) return;
 
       // Real jobs stream actual analysis stage; only demo URLs fabricate.
+      // Wipe the server-rendered placeholder first so no seed line survives.
       if (getJobId()) {
+        body.innerHTML = '';
         startStatusFeed(body);
         return;
       }

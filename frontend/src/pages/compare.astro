@@ -18,7 +18,14 @@ export const prerender = true;
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <style>
+  <!-- is:global is required, not cosmetic. Astro scopes page CSS with a
+       [data-astro-cid-*] attribute that only server-rendered markup carries.
+       Every element these pages build in JS (live-feed lines, hydrated
+       decision/contributor cards, D3 nodes) is created with innerHTML or
+       document.createElement and therefore has no scope attribute — under
+       scoped CSS it renders completely unstyled. This page's stylesheet is
+       self-contained and loaded by this page alone, so going global is safe. -->
+  <style is:global>
     *, *::before, *::after { box-sizing: border-box; }
     html, body {
       margin: 0; padding: 0;
