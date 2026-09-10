@@ -10,6 +10,10 @@ pub enum AppError {
     MissingCredentials,
     GitHubApiError(String),
     NimApiError(String),
+    /// The requested NIM model is not served to this account (404/410).
+    /// Separate from NimApiError so `chat` knows a different model may work,
+    /// while a bad key or rate limit stops the walk immediately.
+    NimModelUnavailable(String),
     DatabaseError(String),
     NotFound(String),
     BadRequest(String),
@@ -21,7 +25,8 @@ impl std::fmt::Display for AppError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let msg = match self {
             AppError::MissingCredentials => "Missing GitHub token or NIM API key".to_string(),
-            AppError::GitHubApiError(m) | AppError::NimApiError(m) | AppError::DatabaseError(m) => m.clone(),
+            AppError::GitHubApiError(m) | AppError::NimApiError(m)
+            | AppError::NimModelUnavailable(m) | AppError::DatabaseError(m) => m.clone(),
             AppError::NotFound(m) | AppError::BadRequest(m) | AppError::Internal(m) => m.clone(),
             AppError::Cancelled => "Analysis terminated by user".to_string(),
         };
@@ -37,6 +42,7 @@ impl IntoResponse for AppError {
             }
             AppError::GitHubApiError(msg) => (StatusCode::BAD_GATEWAY, msg),
             AppError::NimApiError(msg) => (StatusCode::BAD_GATEWAY, msg),
+            AppError::NimModelUnavailable(msg) => (StatusCode::BAD_GATEWAY, msg),
             AppError::DatabaseError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
             AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
             AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),

@@ -3,6 +3,7 @@ use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use sqlx::PgPool;
+use std::collections::HashMap;
 use std::sync::{
     atomic::{AtomicBool, Ordering},
     Arc,
@@ -299,11 +300,18 @@ async fn run_analysis(
     }
     tracing::info!("Intent extraction complete: {} insight nodes", insights.len());
 
+    // Resolve each insight to a point in time by matching its source refs
+    // against the events we just ingested. Without this `intent_nodes.timestamp`
+    // stays NULL — NIM does not emit dates — and the chronological decision
+    // timeline has nothing to plot on any real job.
+    let timeline = EventTimeline::build(&all_commits, &all_prs, &all_issues);
+
     for insight in &insights {
+        let ts = timeline.resolve(&insight.source_refs);
         sqlx::query(
             "INSERT INTO intent_nodes
-               (repo_id, node_type, title, summary, reasoning, contributors, source_refs, confidence)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+               (repo_id, node_type, title, summary, reasoning, contributors, source_refs, timestamp, confidence)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
         )
         .bind(repo_id)
         .bind(&insight.node_type)
@@ -312,6 +320,7 @@ async fn run_analysis(
         .bind(&insight.reasoning)
         .bind(json!(&insight.contributors))
         .bind(json!(&insight.source_refs))
+        .bind(ts)
         .bind(insight.confidence as f64)
         .execute(db)
         .await?;
@@ -359,6 +368,89 @@ async fn fetch_review_threads(
     }
 
     (reviews, pr_comments, issue_comments)
+}
+
+/// Maps a source reference emitted by the extractor back to when it happened.
+///
+/// Models cite evidence loosely: "a1b2c3d", "commit a1b2c3d4e5", "PR #1822",
+/// "#1822", "issue 42". Rather than one database round-trip per insight, this
+/// indexes the events already in memory and matches on a normalised key.
+struct EventTimeline {
+    /// Commit SHA prefix (first 7 chars, lowercase) -> commit time.
+    commits: HashMap<String, NaiveDateTime>,
+    /// PR or issue number -> creation time.
+    numbers: HashMap<i64, NaiveDateTime>,
+}
+
+impl EventTimeline {
+    fn build(
+        commits: &[commits::GitHubCommit],
+        prs:     &[pull_requests::PullRequest],
+        issues:  &[issues::Issue],
+    ) -> Self {
+        let mut by_sha = HashMap::new();
+        for c in commits {
+            if let Some(ts) = parse_github_datetime(&c.commit.author.date) {
+                let sha = c.sha.to_lowercase();
+                if sha.len() >= 7 {
+                    by_sha.insert(sha[..7].to_string(), ts);
+                }
+            }
+        }
+
+        let mut by_number = HashMap::new();
+        for pr in prs {
+            if let Some(ts) = parse_github_datetime(&pr.created_at) {
+                by_number.insert(pr.number, ts);
+            }
+        }
+        for issue in issues {
+            if let Some(ts) = parse_github_datetime(&issue.created_at) {
+                // Don't let an issue overwrite a PR sharing the number space.
+                by_number.entry(issue.number).or_insert(ts);
+            }
+        }
+
+        Self { commits: by_sha, numbers: by_number }
+    }
+
+    /// Earliest resolvable time among the refs, or None if none match.
+    fn resolve(&self, refs: &[String]) -> Option<NaiveDateTime> {
+        refs.iter().filter_map(|r| self.resolve_one(r)).min()
+    }
+
+    fn resolve_one(&self, reference: &str) -> Option<NaiveDateTime> {
+        let lower = reference.to_lowercase();
+
+        // A hex run of 7+ chars is a commit SHA, wherever it sits in the string.
+        let mut run = String::new();
+        for ch in lower.chars() {
+            if ch.is_ascii_hexdigit() {
+                run.push(ch);
+                if run.len() >= 7 {
+                    if let Some(ts) = self.commits.get(&run[..7]) {
+                        return Some(*ts);
+                    }
+                }
+            } else {
+                run.clear();
+            }
+        }
+
+        // Otherwise the first integer is a PR or issue number.
+        let mut digits = String::new();
+        for ch in lower.chars() {
+            if ch.is_ascii_digit() {
+                digits.push(ch);
+            } else if !digits.is_empty() {
+                break;
+            }
+        }
+        digits
+            .parse::<i64>()
+            .ok()
+            .and_then(|n| self.numbers.get(&n).copied())
+    }
 }
 
 async fn set_stage(db: &PgPool, repo_id: Uuid, stage: &str) {

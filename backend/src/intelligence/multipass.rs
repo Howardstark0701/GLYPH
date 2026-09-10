@@ -33,6 +33,9 @@ use crate::intelligence::prompts;
 
 /// Max commits analysed per NIM window — bounds per-call token cost.
 const COMMITS_PER_CHUNK: usize = 40;
+/// How many extraction windows may be in flight at once.
+const MAX_CONCURRENT_WINDOWS: usize = 4;
+
 /// Max NIM windows per job — bounds LLM cost on 10k-commit repos.
 /// Override with MAX_ANALYSIS_CHUNKS.
 fn max_chunks() -> usize {
@@ -197,25 +200,56 @@ pub async fn analyze_events_multipass(
     }
 
     let total = chunks.len();
-    let mut merged: Vec<ExtractedInsight> = Vec::new();
+
+    // Windows are independent, so run them concurrently instead of one after
+    // another. Current NIM models spend ~100s on a window; serially that made
+    // a 6-window analysis take ten minutes, which is unusable interactively.
+    // Concurrency is capped so a large repo cannot fan out into a burst that
+    // trips NVIDIA's per-account rate limit.
+    let permits = std::sync::Arc::new(tokio::sync::Semaphore::new(MAX_CONCURRENT_WINDOWS));
+    let mut tasks = Vec::with_capacity(total);
+
     for (i, chunk) in chunks.iter().enumerate() {
         let prompt = prompts::build_analysis_prompt(&format!(
             "This is {} of the repository's decision history.\n{}",
             i + 1, chunk
         ));
-        match analyze_events_with_prompt(client, api_key, &prompt).await {
-            Ok(insights) => {
+        // reqwest::Client is an Arc internally — cloning shares the pool.
+        let client  = client.clone();
+        let api_key = api_key.to_string();
+        let permits = std::sync::Arc::clone(&permits);
+
+        tasks.push(tokio::spawn(async move {
+            let _permit = permits.acquire().await;
+            let result = analyze_events_with_prompt(&client, &api_key, &prompt).await;
+            (i, result)
+        }));
+    }
+
+    // Collect, then sort by window index so the merged list stays
+    // chronological regardless of which window finished first.
+    let mut collected: Vec<(usize, Vec<ExtractedInsight>)> = Vec::new();
+    for task in tasks {
+        match task.await {
+            Ok((i, Ok(insights))) => {
                 tracing::info!(
                     "NIM extraction window {}/{}: {} insights",
                     i + 1, total, insights.len()
                 );
-                merged.extend(insights);
+                collected.push((i, insights));
+            }
+            Ok((i, Err(e))) => {
+                tracing::warn!("NIM extraction window {}/{} failed: {}", i + 1, total, e);
             }
             Err(e) => {
-                tracing::warn!("NIM extraction window {}/{} failed: {}", i + 1, total, e);
+                tracing::warn!("NIM extraction window task panicked: {}", e);
             }
         }
     }
+    collected.sort_by_key(|(i, _)| *i);
+
+    let merged: Vec<ExtractedInsight> =
+        collected.into_iter().flat_map(|(_, v)| v).collect();
 
     if merged.is_empty() {
         return Err(AppError::NimApiError(

@@ -74,6 +74,9 @@ async fn main() {
     // App state ────────────────────────────────────────────
     let state = Arc::new(AppState {
         db: pool,
+        // 60s suits GitHub's REST calls. NIM completions take far longer and
+        // set their own per-request timeout in intelligence::client, so this
+        // default must not be treated as the ceiling for LLM work.
         http_client: reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(60))
             .build()

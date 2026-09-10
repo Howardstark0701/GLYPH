@@ -6,10 +6,23 @@ services:
     plan: free
     healthCheckPath: /health
     envVars:
+      # DATABASE_URL is deliberately NOT provisioned from a Render database.
+      #
+      # Render's free PostgreSQL instances are deleted after 30 days. When the
+      # original `glyph-db` expired, the backend could no longer connect, the
+      # container crash-looped on boot, and the public API stopped answering
+      # entirely — the health check just hung. Point this at a Postgres with an
+      # indefinite free tier (Neon, Supabase) and paste the connection string
+      # into the Render dashboard as a secret instead.
+      #
+      #   Render → glyph-api → Environment → Add Environment Variable
+      #   Key:   DATABASE_URL
+      #   Value: postgresql://<user>:<pass>@<host>/<db>?sslmode=require
+      #
+      # Migrations run automatically on boot, so a brand-new empty database is
+      # all that is required.
       - key: DATABASE_URL
-        fromDatabase:
-          name: glyph-db
-          property: connectionString
+        sync: false
       # Comma-separated list; main.rs reads FRONTEND_URLS first, then the
       # legacy single-origin FRONTEND_URL. Must be the real Vercel origin --
       # a placeholder here is worse than leaving it unset, because any
@@ -20,8 +33,7 @@ services:
         value: glyph=info,tower_http=info
       - key: NIM_BASE_URL
         value: https://integrate.api.nvidia.com/v1
-
-databases:
-  - name: glyph-db
-    plan: free
-    databaseName: glyph
+      # NIM_MODEL is intentionally unset. Leaving it unset lets the backend
+      # walk its built-in model fallback chain, so a model NVIDIA retires does
+      # not silently degrade every analysis to the deterministic fallback.
+      # Set it only to pin one specific model on purpose.
