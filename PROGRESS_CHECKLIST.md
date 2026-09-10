@@ -37,7 +37,9 @@ Everything below is committed and pushed. Verified locally: `cargo check --all-t
 ## Latest session (2026-09-10) — debugging + structural pass
 
 Bugs found and fixed this session. Each was breaking something the previous
-checklist recorded as complete.
+checklist recorded as complete. All of it is committed and pushed
+(`d825e02` backend, `015949e` frontend, `8c76bd6` docs) after a fresh verify:
+`cargo check --all-targets` clean, `cargo test` 21/21, `npm run build` clean.
 
 ### The client scripts never ran at all
 
