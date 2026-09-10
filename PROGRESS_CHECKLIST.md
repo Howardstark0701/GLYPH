@@ -286,7 +286,24 @@ Two of them were worse: `decisions.astro` and `contributors.astro` wrote
 |---|---|
 | `sharkdp/bat` | 15 decisions, 14/15 timestamped, 9 contributors, ~5m10s |
 | `BurntSushi/ripgrep` | 23 decisions, **23/23 timestamped**, 30 graph nodes, 26 contributors |
-| `sharkdp/hyperfine` | run on the fully fixed backend |
+| `sharkdp/hyperfine` | 18 nodes, **18/18 rated, 18/18 timestamped**, mean 86% |
+| `sharkdp/fd` | 33 nodes, 25 rated / 8 unrated, **33/33 timestamped**, no duplicate titles, mean 90% |
+
+Two of those runs demonstrate the new recovery paths doing real work:
+
+- On `hyperfine` the consolidation pass logged `31 insights -> 18 (0 unrated)`
+  — every consolidated insight kept a score, where before the merge would have
+  dropped them all.
+- On `fd` four of six extraction windows returned narration instead of JSON.
+  Two of them parsed on the resample (10 and 8 insights recovered); the other
+  two failed twice and were logged. Consolidation then failed to parse and the
+  deterministic dedupe took over, which is the documented fallback — it left
+  33 nodes with **no duplicate titles**.
+
+`/compare` was exercised against two completed jobs and returns real profiles
+and notes ("Repository B has 2.1× the decision volume of repository A (23 vs
+11)", "Mean decision confidence runs 2 points higher in repository B (88 vs
+86)"), with the means now taken over rated nodes only.
 
 Also exercised directly against the running stack: `/health` (200, 11ms), both
 migrations applied (9 tables), URL validation (foreign host, extra path
@@ -294,9 +311,9 @@ segments and a 2049-character URL all rejected with 400), unknown job id
 (404), and the rate limiter (120 requests pass, the 121st returns 429 with
 `retry-after: 19`).
 
-`cargo test` 25/25 green — 4 new regression tests covering unrated confidence,
-blank-insight rejection, and consolidation inheritance. `cargo check
---all-targets` and `npm run build` clean.
+`cargo test` 26/26 green — 5 new regression tests covering unrated confidence,
+blank-insight rejection, consolidation inheritance, and which HTTP statuses
+count as transient. `cargo check --all-targets` and `npm run build` clean.
 
 ### Known, not fixed
 
