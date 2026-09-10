@@ -29,8 +29,13 @@ pub async fn get_status(
     State(state): State<Arc<AppState>>,
     Path(id): Path<Uuid>,
 ) -> Result<Json<Value>, AppError> {
+    // owner/name travel with the status because the frontend has nothing
+    // else to identify the repository with: every page header and document
+    // title read "unknown" on a real job, since the job id in the URL says
+    // nothing about which repository it analysed.
     match sqlx::query(
-        "SELECT id::text, status, stage, error_message, analyzed_at::text
+        "SELECT id::text, status, stage, error_message, analyzed_at::text,
+                owner, name, github_url
          FROM repos WHERE id = $1"
     )
     .bind(id)
@@ -42,6 +47,9 @@ pub async fn get_status(
             "stage": row.try_get::<String,_>("stage").ok(),
             "error_message": row.try_get::<String,_>("error_message").ok(),
             "analyzed_at": row.try_get::<String,_>("analyzed_at").ok(),
+            "owner": row.try_get::<String,_>("owner").ok(),
+            "name": row.try_get::<String,_>("name").ok(),
+            "github_url": row.try_get::<String,_>("github_url").ok(),
         }))),
         Ok(None) => Err(AppError::NotFound("repo not found".into())),
         Err(e) => Err(AppError::DatabaseError(e.to_string())),
@@ -74,14 +82,20 @@ pub async fn get_debates(
     }).count() as f64;
     let contention = if total > 0.0 { ((total - resolved) / total * 100.0).round() } else { 0.0 };
     let agreement  = if total > 0.0 { (resolved / total * 100.0).round() } else { 0.0 };
-    let conf_avg   = if total > 0.0 {
-        rows.iter().filter_map(|r| r.confidence).sum::<f64>() / total * 100.0
-    } else { 0.0 };
+    // Average over the nodes that carry a confidence, not over all of them.
+    // A model that omits the score leaves NULL; dividing by every row would
+    // report a mean dragged toward zero by rows that were never rated.
+    let rated: Vec<f64> = rows.iter().filter_map(|r| r.confidence).collect();
+    let conf_avg   = if rated.is_empty() {
+        None
+    } else {
+        Some((rated.iter().sum::<f64>() / rated.len() as f64 * 100.0).round())
+    };
 
     Ok(Json(json!({
         "repo_id": id.to_string(), "debates": rows,
         "metrics": { "total": total as u64, "agreement_pct": agreement,
-                     "contention_pct": contention, "confidence_avg": conf_avg.round() }
+                     "contention_pct": contention, "confidence_avg": conf_avg }
     })))
 }
 
@@ -120,7 +134,8 @@ pub async fn get_contributors(
 
     use std::collections::HashMap;
     #[derive(Default)]
-    struct Stats { decisions: u32, debates: u32, rejections: u32, total: u32, conf_sum: f64 }
+    struct Stats { decisions: u32, debates: u32, rejections: u32, total: u32,
+                   conf_sum: f64, conf_rated: u32 }
 
     let mut map: HashMap<String, Stats> = HashMap::new();
     for node in &node_rows {
@@ -129,7 +144,10 @@ pub async fn get_contributors(
                 if let Value::String(handle) = cv {
                     let e = map.entry(handle.clone()).or_default();
                     e.total    += 1;
-                    e.conf_sum += node.confidence.unwrap_or(0.0);
+                    if let Some(c) = node.confidence {
+                        e.conf_sum   += c;
+                        e.conf_rated += 1;
+                    }
                     match node.node_type.as_deref() {
                         Some("decision")  => e.decisions  += 1,
                         Some("debate")    => e.debates    += 1,
@@ -142,9 +160,13 @@ pub async fn get_contributors(
     }
 
     let contributors: Vec<Value> = map.into_iter().map(|(handle, s)| {
-        let avg = if s.total > 0 { s.conf_sum / s.total as f64 * 100.0 } else { 0.0 };
+        // Null rather than 0 when none of this contributor's nodes were
+        // rated — the UI renders an em-dash instead of claiming 0%.
+        let avg = if s.conf_rated > 0 {
+            Some((s.conf_sum / s.conf_rated as f64 * 100.0).round())
+        } else { None };
         json!({ "handle": handle, "decisions": s.decisions, "debates": s.debates,
-                "rejections": s.rejections, "total_nodes": s.total, "avg_confidence": avg.round() })
+                "rejections": s.rejections, "total_nodes": s.total, "avg_confidence": avg })
     }).collect();
 
     Ok(Json(json!({ "repo_id": id.to_string(), "contributors": contributors })))

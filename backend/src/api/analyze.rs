@@ -321,7 +321,7 @@ async fn run_analysis(
         .bind(json!(&insight.contributors))
         .bind(json!(&insight.source_refs))
         .bind(ts)
-        .bind(insight.confidence as f64)
+        .bind(insight.confidence.map(|c| c as f64))
         .execute(db)
         .await?;
     }

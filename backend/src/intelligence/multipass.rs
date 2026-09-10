@@ -221,7 +221,22 @@ pub async fn analyze_events_multipass(
 
         tasks.push(tokio::spawn(async move {
             let _permit = permits.acquire().await;
-            let result = analyze_events_with_prompt(&client, &api_key, &prompt).await;
+
+            // One retry when the response yields no parseable insights. A
+            // reasoning model sometimes spends its whole token budget
+            // narrating ("We need to extract: - Decision nodes: …") and never
+            // emits the array. That is a sampling accident, not a broken
+            // prompt, and a second draw usually succeeds — so rather than lose
+            // a sixth of the repository's history to it, ask once more.
+            // Transport failures are already retried inside `chat`.
+            let mut result = analyze_events_with_prompt(&client, &api_key, &prompt).await;
+            if matches!(&result, Err(AppError::NimApiError(m)) if m.contains("Failed to parse")) {
+                tracing::warn!(
+                    "NIM extraction window {} returned no parseable insights — resampling once",
+                    i + 1
+                );
+                result = analyze_events_with_prompt(&client, &api_key, &prompt).await;
+            }
             (i, result)
         }));
     }
@@ -261,10 +276,12 @@ pub async fn analyze_events_multipass(
     if merged.len() >= SYNTHESIS_THRESHOLD {
         match synthesize(client, api_key, &merged).await {
             Ok(clean) if !clean.is_empty() => {
+                let clean = inherit_confidence(clean, &merged);
                 tracing::info!(
-                    "NIM consolidation pass: {} insights -> {}",
+                    "NIM consolidation pass: {} insights -> {} ({} unrated)",
                     merged.len(),
-                    clean.len()
+                    clean.len(),
+                    clean.iter().filter(|i| i.confidence.is_none()).count()
                 );
                 return Ok(clean);
             }
@@ -297,13 +314,54 @@ async fn synthesize(
          summaries toward the higher-confidence version, and keep contributors and source_refs \
          unioned. Drop entries with no clear evidence. \
          Return ONLY a JSON array with fields: node_type, title, summary, reasoning, contributors, \
-         source_refs, confidence.\n\n{}",
+         source_refs, confidence. Every object MUST carry a numeric confidence \
+         between 0 and 1 — carry the input entry's confidence across unless merging \
+         changes it.\n\n{}",
         input
     );
     let system = "You are a reconciliation analyst deduplicating intelligence records. Return only a JSON array.";
     let content = chat(client, api_key, &model_from_env(), system, &prompt, 0.1, 8192).await?;
     parse_insights(&content)
         .map_err(|e| AppError::NimApiError(format!("failed to parse consolidation output: {e}")))
+}
+
+/// Carry extraction-pass confidence through consolidation.
+///
+/// The consolidation prompt asks for `confidence` back, but models routinely
+/// drop the field while rewriting each record — on one ripgrep run 20 of 23
+/// consolidated insights came back unrated even though the extraction pass
+/// had scored them. That score is real data the model already produced, so
+/// rather than lose it in the merge, match each consolidated insight back to
+/// the pre-consolidation set by title and inherit the best score found there.
+///
+/// Only insights the consolidation pass left unrated are touched; a score it
+/// did supply always wins, because it reflects the merged record.
+fn inherit_confidence(
+    mut clean: Vec<ExtractedInsight>,
+    source:    &[ExtractedInsight],
+) -> Vec<ExtractedInsight> {
+    use std::collections::HashMap;
+
+    let mut by_title: HashMap<String, f32> = HashMap::new();
+    for i in source {
+        if let Some(c) = i.confidence {
+            let key = i.title.trim().to_lowercase();
+            if key.is_empty() {
+                continue;
+            }
+            by_title
+                .entry(key)
+                .and_modify(|best| { if c > *best { *best = c; } })
+                .or_insert(c);
+        }
+    }
+
+    for i in clean.iter_mut() {
+        if i.confidence.is_none() {
+            i.confidence = by_title.get(&i.title.trim().to_lowercase()).copied();
+        }
+    }
+    clean
 }
 
 /// Deterministic dedupe on (node_type, lowercased title) — the safety net
@@ -347,7 +405,7 @@ pub fn fallback_insights(
             reasoning: "Fallback heuristic: derived directly from the commit message".into(),
             contributors: c.author.as_ref().and_then(|a| a.login.clone()).into_iter().collect(),
             source_refs: vec![c.sha.clone()],
-            confidence: if is_arch { 0.70 } else { 0.62 },
+            confidence: Some(if is_arch { 0.70 } else { 0.62 }),
         });
     }
 
@@ -364,7 +422,7 @@ pub fn fallback_insights(
             ),
             contributors: pr.user.as_ref().map(|u| vec![u.login.clone()]).unwrap_or_default(),
             source_refs: vec![format!("PR#{}", pr.number)],
-            confidence: if merged { 0.72 } else { 0.60 },
+            confidence: Some(if merged { 0.72 } else { 0.60 }),
         });
     }
 
@@ -444,9 +502,41 @@ mod tests {
         assert!(insights.iter().any(|i| i.node_type == "decision" && i.title.contains("PR title 1")));
         assert!(insights.iter().any(|i| i.node_type == "rejection" && i.title.contains("PR title 2")));
         for i in &insights {
-            assert!((0.0..=1.0).contains(&i.confidence));
+            assert!(matches!(i.confidence, Some(c) if (0.0..=1.0).contains(&c)));
             assert!(!i.source_refs.is_empty());
         }
+    }
+
+    /// The consolidation pass rewrites every record and routinely drops the
+    /// confidence field. The score the extraction pass produced is real, so
+    /// it must survive the merge rather than leaving the insight unrated.
+    #[test]
+    fn consolidation_inherits_confidence_the_model_dropped() {
+        let mk = |title: &str, conf: Option<f32>| ExtractedInsight {
+            node_type: "decision".into(), title: title.into(),
+            summary: "s".into(), reasoning: "r".into(),
+            contributors: vec![], source_refs: vec![], confidence: conf,
+        };
+
+        let source = vec![
+            mk("Adopt Axum", Some(0.9)),
+            mk("Adopt Axum", Some(0.7)),
+            mk("Drop Warp", Some(0.4)),
+        ];
+        let clean = vec![
+            mk("adopt axum", None),
+            mk("Drop Warp", Some(0.95)),
+            mk("Brand new title", None),
+        ];
+
+        let out = inherit_confidence(clean, &source);
+
+        // Matched case-insensitively, and takes the best score available.
+        assert_eq!(out[0].confidence, Some(0.9));
+        // A score the consolidation pass did supply wins over the source.
+        assert_eq!(out[1].confidence, Some(0.95));
+        // Nothing to inherit stays honestly unrated.
+        assert_eq!(out[2].confidence, None);
     }
 
     #[test]
@@ -454,12 +544,12 @@ mod tests {
         let a = ExtractedInsight {
             node_type: "decision".into(), title: "X".into(),
             summary: String::new(), reasoning: String::new(),
-            contributors: vec![], source_refs: vec![], confidence: 0.5,
+            contributors: vec![], source_refs: vec![], confidence: Some(0.5),
         };
         let b = ExtractedInsight {
             node_type: "decision".into(), title: "x".into(),
             summary: String::new(), reasoning: String::new(),
-            contributors: vec![], source_refs: vec![], confidence: 0.6,
+            contributors: vec![], source_refs: vec![], confidence: Some(0.6),
         };
         let out = dedupe(&[a.clone(), b.clone()]);
         assert_eq!(out.len(), 1);

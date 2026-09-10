@@ -64,6 +64,18 @@ fn model_unavailable(status: reqwest::StatusCode) -> bool {
     status == reqwest::StatusCode::NOT_FOUND || status == reqwest::StatusCode::GONE
 }
 
+/// Failures worth trying again: the service is briefly busy or rate-limiting,
+/// not refusing the request. Observed in practice as 503s and dropped
+/// connections when several extraction windows are in flight at once — on one
+/// hyperfine run five of six windows died this way and the analysis kept only
+/// the insights from the survivor.
+fn transient(status: reqwest::StatusCode) -> bool {
+    status == reqwest::StatusCode::TOO_MANY_REQUESTS || status.is_server_error()
+}
+
+/// How many extra attempts a single NIM call gets after a transient failure.
+const NIM_RETRIES: u32 = 2;
+
 #[derive(Debug, Serialize)]
 pub struct NimRequest {
     pub model: String,
@@ -115,8 +127,15 @@ pub struct ExtractedInsight {
     pub contributors: Vec<String>,
     #[serde(default, deserialize_with = "de_string_list")]
     pub source_refs:  Vec<String>,
+    /// `None` when the model omitted the key or returned something
+    /// unparseable. It must not collapse to 0.0: a well-reasoned insight the
+    /// model simply forgot to score is not an insight it scored at zero, and
+    /// defaulting produced exactly that lie — cards reading 0%, the timeline
+    /// scatter pinning them to the floor, and the mean confidence dragged
+    /// down by rows that were never rated. NULL flows through to the API and
+    /// the UI renders an em-dash.
     #[serde(default, deserialize_with = "de_confidence")]
-    pub confidence:   f32,
+    pub confidence:   Option<f32>,
 }
 
 fn default_node_type() -> String {
@@ -155,23 +174,24 @@ where
 }
 
 /// Accept `0.85`, `"0.85"`, `85`, or `"85%"`, normalised to 0.0..=1.0.
-fn de_confidence<'de, D>(d: D) -> Result<f32, D::Error>
+/// Anything else — a missing key, `null`, a word, an empty string — is
+/// `None`, meaning unrated. Only a value the model actually supplied is
+/// allowed to become a number.
+fn de_confidence<'de, D>(d: D) -> Result<Option<f32>, D::Error>
 where
     D: serde::Deserializer<'de>,
 {
     let value = Value::deserialize(d)?;
     let raw = match value {
-        Value::Number(n) => n.as_f64().unwrap_or(0.0) as f32,
-        Value::String(s) => s
-            .trim()
-            .trim_end_matches('%')
-            .parse::<f32>()
-            .unwrap_or(0.0),
-        _ => 0.0,
+        Value::Number(n) => n.as_f64().map(|v| v as f32),
+        Value::String(s) => s.trim().trim_end_matches('%').parse::<f32>().ok(),
+        _ => None,
     };
     // A model asked for a 0-1 score often answers on a 0-100 scale.
-    let normalised = if raw > 1.0 { raw / 100.0 } else { raw };
-    Ok(normalised.clamp(0.0, 1.0))
+    Ok(raw.map(|r| {
+        let normalised = if r > 1.0 { r / 100.0 } else { r };
+        normalised.clamp(0.0, 1.0)
+    }))
 }
 
 /// One consolidated chat call — the only NIM HTTP path in the app. Both the
@@ -205,16 +225,35 @@ pub async fn chat(
 
     let mut last_err = None;
     for candidate in &chain {
-        match chat_once(client, api_key, candidate, system, user, temperature, max_tokens).await {
-            Ok(content) => {
-                set_resolved_model(candidate);
-                return Ok(content);
+        // Each candidate gets NIM_RETRIES extra attempts for transient
+        // failures, backing off between them, before the chain moves on.
+        let mut attempt = 0;
+        loop {
+            match chat_once(client, api_key, candidate, system, user, temperature, max_tokens).await {
+                Ok(content) => {
+                    set_resolved_model(candidate);
+                    return Ok(content);
+                }
+                Err(AppError::NimModelUnavailable(msg)) => {
+                    tracing::warn!("NIM model '{candidate}' unavailable, trying next: {msg}");
+                    last_err = Some(AppError::NimApiError(msg));
+                    break;
+                }
+                Err(AppError::NimTransient(msg)) if attempt < NIM_RETRIES => {
+                    attempt += 1;
+                    let backoff = std::time::Duration::from_secs(2u64.pow(attempt));
+                    tracing::warn!(
+                        "NIM transient failure (attempt {}/{}), retrying in {}s: {}",
+                        attempt, NIM_RETRIES + 1, backoff.as_secs(), msg
+                    );
+                    tokio::time::sleep(backoff).await;
+                }
+                Err(AppError::NimTransient(msg)) => {
+                    tracing::warn!("NIM still failing after {} attempts: {}", NIM_RETRIES + 1, msg);
+                    return Err(AppError::NimApiError(msg));
+                }
+                Err(e) => return Err(e),
             }
-            Err(AppError::NimModelUnavailable(msg)) => {
-                tracing::warn!("NIM model '{candidate}' unavailable, trying next: {msg}");
-                last_err = Some(AppError::NimApiError(msg));
-            }
-            Err(e) => return Err(e),
         }
     }
 
@@ -266,16 +305,21 @@ async fn chat_once(
         .json(&request)
         .send()
         .await
-        .map_err(|e| AppError::NimApiError(format!("NIM request failed: {e}")))?;
+        // A connection that never completes is a transport hiccup, not a bad
+        // request. Under four concurrent windows NVIDIA drops these regularly.
+        .map_err(|e| AppError::NimTransient(format!("NIM request failed: {e}")))?;
 
     if !resp.status().is_success() {
         let status = resp.status();
         let body   = resp.text().await.unwrap_or_default();
         let msg = format!("NIM API returned {} for model '{}': {}", status, model, body);
         // Distinguish "this model is gone" from "this request is bad" so the
-        // caller knows whether trying another model could possibly help.
+        // caller knows whether trying another model could possibly help, and
+        // both from "the service is briefly busy", which is worth retrying.
         return Err(if model_unavailable(status) {
             AppError::NimModelUnavailable(msg)
+        } else if transient(status) {
+            AppError::NimTransient(msg)
         } else {
             AppError::NimApiError(msg)
         });
@@ -319,6 +363,28 @@ pub async fn analyze_events_with_prompt(
 /// it inside a "Here is the result:" narrative, or nest it under an object key.
 /// This walks every reasonable shape before giving up.
 pub fn parse_insights(content: &str) -> Result<Vec<ExtractedInsight>, String> {
+    let all = parse_insights_inner(content)?;
+    let total = all.len();
+    let kept: Vec<ExtractedInsight> = all.into_iter().filter(is_substantive).collect();
+    if kept.len() < total {
+        tracing::warn!(
+            "Dropped {} empty insight(s) from NIM response — a parsed object with no              title and no prose is a placeholder the model emitted, not a finding",
+            total - kept.len()
+        );
+    }
+    Ok(kept)
+}
+
+/// An insight with no title and nothing written about it carries no
+/// information. Models emit these as trailing placeholders, and one reached
+/// the UI as a blank decision card sitting among real ones.
+fn is_substantive(i: &ExtractedInsight) -> bool {
+    !i.title.trim().is_empty()
+        || !i.summary.trim().is_empty()
+        || !i.reasoning.trim().is_empty()
+}
+
+fn parse_insights_inner(content: &str) -> Result<Vec<ExtractedInsight>, String> {
     // Reasoning models (nemotron-3-*, gpt-oss) narrate before answering and
     // may wrap the narration in <think> tags. Drop that first — the prose is
     // full of brackets and braces that wreck naive span scanning.
@@ -509,7 +575,7 @@ mod tests {
         let insights = parse_insights(json).unwrap();
         assert_eq!(insights.len(), 1);
         assert_eq!(insights[0].node_type, "decision");
-        assert_eq!(insights[0].confidence, 0.9);
+        assert_eq!(insights[0].confidence, Some(0.9));
     }
 
     #[test]
@@ -615,7 +681,7 @@ On reflection:
         assert_eq!(insights.len(), 3);
 
         // "85%" -> 0.85
-        assert!((insights[0].confidence - 0.85).abs() < 1e-4);
+        assert!(matches!(insights[0].confidence, Some(c) if (c - 0.85).abs() < 1e-4));
         assert_eq!(insights[0].summary, "", "missing keys default, not fail");
 
         // node_type defaults rather than dropping the object
@@ -623,9 +689,73 @@ On reflection:
         assert_eq!(insights[1].contributors, vec!["solo_dev".to_string()]);
 
         // 72 on a 0-100 scale -> 0.72; {"login": ...} -> the handle
-        assert!((insights[2].confidence - 0.72).abs() < 1e-4);
+        assert!(matches!(insights[2].confidence, Some(c) if (c - 0.72).abs() < 1e-4));
         assert_eq!(insights[2].contributors, vec!["octocat".to_string()]);
         assert_eq!(insights[2].source_refs, vec!["abc123".to_string()]);
+    }
+
+    /// A well-reasoned insight the model simply forgot to score must come
+    /// back unrated, not scored zero. Defaulting to 0.0 put real findings on
+    /// the floor of the confidence scatter and pulled every average down.
+    #[test]
+    fn missing_confidence_is_unrated_not_zero() {
+        let json = r#"[
+          {"node_type":"decision","title":"Adopt Axum","summary":"s","reasoning":"r"},
+          {"node_type":"decision","title":"Scored","summary":"s","reasoning":"r","confidence":0.9},
+          {"node_type":"decision","title":"Null","summary":"s","reasoning":"r","confidence":null},
+          {"node_type":"decision","title":"Words","summary":"s","reasoning":"r","confidence":"high"}
+        ]"#;
+        let insights = parse_insights(json).unwrap();
+        assert_eq!(insights.len(), 4);
+        assert_eq!(insights[0].confidence, None, "omitted key is unrated");
+        assert_eq!(insights[1].confidence, Some(0.9));
+        assert_eq!(insights[2].confidence, None, "explicit null is unrated");
+        assert_eq!(insights[3].confidence, None, "unparseable is unrated");
+    }
+
+    /// Models emit trailing placeholder objects. One reached the UI as a
+    /// blank decision card sitting among real ones.
+    #[test]
+    fn drops_insights_with_no_content() {
+        let json = r#"[
+          {"node_type":"decision","title":"Real","summary":"s","reasoning":"r","confidence":0.8},
+          {"node_type":"decision","title":"","summary":"","reasoning":"","contributors":[],"source_refs":[]},
+          {"node_type":"decision","title":"   ","summary":"  ","reasoning":""}
+        ]"#;
+        let insights = parse_insights(json).unwrap();
+        assert_eq!(insights.len(), 1);
+        assert_eq!(insights[0].title, "Real");
+    }
+
+    /// An insight with no title still counts if it says something.
+    #[test]
+    fn keeps_untitled_insight_that_has_prose() {
+        let json = r#"[{"node_type":"debate","title":"","summary":"Long argument about the pager","reasoning":""}]"#;
+        let insights = parse_insights(json).unwrap();
+        assert_eq!(insights.len(), 1);
+    }
+
+    /// Retrying must be reserved for "the service is busy". Retrying a 400 or
+    /// a 401 wastes the analysis budget, and treating a 404 as transient would
+    /// stop the model fallback chain from ever advancing.
+    #[test]
+    fn only_busy_responses_are_treated_as_transient() {
+        use reqwest::StatusCode;
+
+        assert!(transient(StatusCode::SERVICE_UNAVAILABLE));
+        assert!(transient(StatusCode::BAD_GATEWAY));
+        assert!(transient(StatusCode::INTERNAL_SERVER_ERROR));
+        assert!(transient(StatusCode::TOO_MANY_REQUESTS));
+
+        assert!(!transient(StatusCode::BAD_REQUEST));
+        assert!(!transient(StatusCode::UNAUTHORIZED));
+        assert!(!transient(StatusCode::NOT_FOUND));
+        assert!(!transient(StatusCode::GONE));
+
+        // A retired model must stay on the "try the next model" path.
+        assert!(model_unavailable(StatusCode::NOT_FOUND));
+        assert!(model_unavailable(StatusCode::GONE));
+        assert!(!model_unavailable(StatusCode::SERVICE_UNAVAILABLE));
     }
 
     #[test]

@@ -11,6 +11,12 @@ pub enum AppError {
     GitHubApiError(String),
     NimApiError(String),
     /// The requested NIM model is not served to this account (404/410).
+    /// Separate from NimApiError so `chat` knows the same call is worth
+    /// repeating: the service was briefly busy (5xx/429) or the connection
+    /// dropped, rather than the request being wrong. Never surfaces to a
+    /// caller — `chat` converts it once the retries are spent.
+    NimTransient(String),
+
     /// Separate from NimApiError so `chat` knows a different model may work,
     /// while a bad key or rate limit stops the walk immediately.
     NimModelUnavailable(String),
@@ -26,7 +32,8 @@ impl std::fmt::Display for AppError {
         let msg = match self {
             AppError::MissingCredentials => "Missing GitHub token or NIM API key".to_string(),
             AppError::GitHubApiError(m) | AppError::NimApiError(m)
-            | AppError::NimModelUnavailable(m) | AppError::DatabaseError(m) => m.clone(),
+            | AppError::NimModelUnavailable(m) | AppError::NimTransient(m)
+            | AppError::DatabaseError(m) => m.clone(),
             AppError::NotFound(m) | AppError::BadRequest(m) | AppError::Internal(m) => m.clone(),
             AppError::Cancelled => "Analysis terminated by user".to_string(),
         };
@@ -43,6 +50,9 @@ impl IntoResponse for AppError {
             AppError::GitHubApiError(msg) => (StatusCode::BAD_GATEWAY, msg),
             AppError::NimApiError(msg) => (StatusCode::BAD_GATEWAY, msg),
             AppError::NimModelUnavailable(msg) => (StatusCode::BAD_GATEWAY, msg),
+            // Only reachable if a transient error escapes `chat`'s retry loop;
+            // it means upstream was busy, so 502 is the honest answer.
+            AppError::NimTransient(msg) => (StatusCode::BAD_GATEWAY, msg),
             AppError::DatabaseError(msg) => (StatusCode::INTERNAL_SERVER_ERROR, msg),
             AppError::NotFound(msg) => (StatusCode::NOT_FOUND, msg),
             AppError::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),

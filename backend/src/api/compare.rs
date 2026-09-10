@@ -100,6 +100,7 @@ async fn intent_profile(state: &Arc<AppState>, id: Uuid) -> Result<Profile, AppE
     let mut contribs = BTreeSet::new();
     let mut total = 0u64;
     let mut conf_sum = 0.0f64;
+    let mut conf_rated = 0u64;
 
     for r in &rows {
         if let Ok(nt) = r.try_get::<String, _>("node_type") {
@@ -112,8 +113,11 @@ async fn intent_profile(state: &Arc<AppState>, id: Uuid) -> Result<Profile, AppE
                 }
             }
         }
-        if let Ok(c) = r.try_get::<f64, _>("confidence") {
-            conf_sum += c;
+        // NULL confidence means the model never scored that node. Counting
+        // it as zero would make a repository look less certain than it is.
+        if let Ok(Some(c)) = r.try_get::<Option<f64>, _>("confidence") {
+            conf_sum   += c;
+            conf_rated += 1;
         }
         total += 1;
     }
@@ -122,7 +126,7 @@ async fn intent_profile(state: &Arc<AppState>, id: Uuid) -> Result<Profile, AppE
         total,
         type_distribution: dist,
         contributors: contribs,
-        avg_confidence: if total > 0 { conf_sum / total as f64 * 100.0 } else { 0.0 },
+        avg_confidence: if conf_rated > 0 { conf_sum / conf_rated as f64 * 100.0 } else { 0.0 },
     })
 }
 
