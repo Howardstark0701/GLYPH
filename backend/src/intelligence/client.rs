@@ -353,7 +353,10 @@ pub async fn analyze_events_with_prompt(
         AppError::NimApiError(format!(
             "Failed to parse NIM JSON response: {}. Raw: {}",
             e,
-            &content[..content.len().min(200)]
+            // By characters, not bytes: slicing model output at byte 200 can
+            // land mid-character and panic the whole extraction task, and
+            // this text is full of em-dashes and smart quotes.
+            content.chars().take(200).collect::<String>()
         ))
     })
 }

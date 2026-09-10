@@ -371,7 +371,10 @@ fn dedupe(insights: &[ExtractedInsight]) -> Vec<ExtractedInsight> {
     let mut seen = HashSet::new();
     let mut out  = Vec::new();
     for i in insights {
-        let key = format!("{}::{}", i.node_type, i.title.to_lowercase());
+        // Trimmed as well as lowercased, to agree with inherit_confidence.
+        // These two disagreed once, so a title with stray whitespace was the
+        // same node to one function and a different node to the other.
+        let key = format!("{}::{}", i.node_type, i.title.trim().to_lowercase());
         if seen.insert(key) {
             out.push(i.clone());
         }
@@ -537,6 +540,28 @@ mod tests {
         assert_eq!(out[1].confidence, Some(0.95));
         // Nothing to inherit stays honestly unrated.
         assert_eq!(out[2].confidence, None);
+    }
+
+    /// dedupe and inherit_confidence must normalise a title the same way.
+    /// They disagreed once — one trimmed and the other did not — so a padded
+    /// title was one node to one function and two to the other.
+    #[test]
+    fn dedupe_and_inheritance_agree_on_whitespace() {
+        let padded = ExtractedInsight {
+            node_type: "decision".into(), title: "  Adopt Axum  ".into(),
+            summary: String::new(), reasoning: String::new(),
+            contributors: vec![], source_refs: vec![], confidence: None,
+        };
+        let plain = ExtractedInsight {
+            node_type: "decision".into(), title: "Adopt Axum".into(),
+            summary: String::new(), reasoning: String::new(),
+            contributors: vec![], source_refs: vec![], confidence: Some(0.9),
+        };
+
+        assert_eq!(dedupe(&[padded.clone(), plain.clone()]).len(), 1);
+
+        let out = inherit_confidence(vec![padded], &[plain]);
+        assert_eq!(out[0].confidence, Some(0.9));
     }
 
     #[test]

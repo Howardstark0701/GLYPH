@@ -32,7 +32,10 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
  * API call hit the user's own machine — graphs/SVG never hydrated.
  */
 export function apiBase(): string {
-  const env = (import.meta as any).env?.PUBLIC_API_BASE_URL;
+  // The literal dotted form matters: Vite substitutes this exact text at
+  // build time. Written as `(import.meta as any).env?.X` it is not
+  // substituted, and the override documented in the README did nothing.
+  const env = import.meta.env.PUBLIC_API_BASE_URL;
   if (env) return env;
   if (typeof window !== 'undefined' && (window as any).__GLYPH_API__) {
     return (window as any).__GLYPH_API__;

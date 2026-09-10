@@ -476,10 +476,12 @@ pub fn parse_github_url(url: &str) -> Option<(String, String)> {
     if trimmed.is_empty() {
         return None;
     }
-    let stripped = trimmed
-        .strip_suffix(".git")
-        .unwrap_or(trimmed)
-        .trim_end_matches('/');
+    // Trailing slashes first, then .git, then slashes again. Stripping .git
+    // first meant a clone URL pasted with a trailing slash ("…/bat.git/")
+    // kept its suffix and was ingested as a repository named "bat.git".
+    let stripped = trimmed.trim_end_matches('/');
+    let stripped = stripped.strip_suffix(".git").unwrap_or(stripped);
+    let stripped = stripped.trim_end_matches('/');
 
     let rest = stripped
         .strip_prefix("https://github.com/")
@@ -523,6 +525,20 @@ mod tests {
         assert_eq!(
             parse_github_url("https://github.com/owner/repo/"),
             Some(("owner".into(), "repo".into()))
+        );
+    }
+
+    /// A clone URL pasted with a trailing slash used to keep its .git suffix
+    /// and be ingested as a repository literally named "bat.git".
+    #[test]
+    fn parses_git_suffix_followed_by_slash() {
+        assert_eq!(
+            parse_github_url("https://github.com/sharkdp/bat.git/"),
+            Some(("sharkdp".into(), "bat".into()))
+        );
+        assert_eq!(
+            parse_github_url("https://github.com/sharkdp/bat.git//"),
+            Some(("sharkdp".into(), "bat".into()))
         );
     }
 

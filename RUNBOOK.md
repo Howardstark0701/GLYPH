@@ -224,7 +224,7 @@ curl -H "Authorization: Bearer $GH_PAT" https://api.github.com/rate_limit
 | `NIM_TIMEOUT_SECS` | `300` | Per-request budget for LLM calls. |
 | `MAX_ANALYSIS_CHUNKS` | `6` | Extraction windows per job — bounds LLM cost and wall-clock time. |
 | `MAX_COMMITS` | `1000` | Commit ingestion cap. |
-| `PUBLIC_API_BASE_URL` | — | Frontend override for the API base. Unset falls back to localhost in dev and the Render URL in production. |
+| `PUBLIC_API_BASE_URL` | — | Frontend override for the API base. Set at build time (`npm run build`); Astro's dev server does not apply it, where the localhost fallback is used instead. Unset falls back to localhost in dev and the Render URL in production. |
 
 ---
 

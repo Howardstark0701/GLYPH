@@ -10,6 +10,14 @@ pub struct Issue {
     pub state: String,
     pub user: Option<IssueUser>,
     pub created_at: String,
+    /// Present only when GitHub is describing a pull request.
+    ///
+    /// The repository issues endpoint returns pull requests alongside issues
+    /// by design, and no query parameter on that endpoint turns it off. This
+    /// marker is the documented way to tell them apart; without it every PR
+    /// was ingested twice — once properly, and once as a fake issue.
+    #[serde(default)]
+    pub pull_request: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -29,7 +37,7 @@ const PER_PAGE:  u32 = 100;
 /// Bounded sweep over a single issue's comment thread.
 const THREAD_PAGES: u32 = 3;
 
-/// Fetch all issues across pages (excludes PRs via filter)
+/// Fetch all issues across pages, excluding pull requests.
 pub async fn fetch_all_issues(
     client: &reqwest::Client,
     token:  &str,
@@ -39,20 +47,36 @@ pub async fn fetch_all_issues(
     let mut all  = Vec::new();
     let mut page = 1u32;
 
+    let mut skipped = 0usize;
+
     loop {
-        // filter=issues excludes pull requests from the issues endpoint
+        // No `filter` param: it belongs to the *user* issues endpoint, does
+        // nothing here, and its presence disguised the fact that pull
+        // requests were being ingested as issues.
         let url = format!(
-            "https://api.github.com/repos/{}/{}/issues?state=all&filter=all&per_page={}&page={}",
+            "https://api.github.com/repos/{}/{}/issues?state=all&per_page={}&page={}",
             owner, repo, PER_PAGE, page
         );
 
         let resp   = gh_get(client, token, &url).await?;
         let batch: Vec<Issue> = resp.json().await?;
         let done = batch.len() < PER_PAGE as usize;
-        all.extend(batch);
+
+        let before = batch.len();
+        let issues_only: Vec<Issue> =
+            batch.into_iter().filter(|i| i.pull_request.is_none()).collect();
+        skipped += before - issues_only.len();
+        all.extend(issues_only);
 
         if done || page >= max_list_pages() { break; }
         page += 1;
+    }
+
+    if skipped > 0 {
+        tracing::info!(
+            "skipped {} pull request(s) returned by the issues endpoint",
+            skipped
+        );
     }
 
     Ok(all)
