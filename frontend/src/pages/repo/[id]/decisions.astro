@@ -293,7 +293,9 @@ import RepoSidebar from '../../../components/RepoSidebar.astro';
       outline-offset: 0;
     }
     .mg-cell[data-level="0"] { cursor: default; }
-    .mg-cell:not([data-level="0"]) { cursor: pointer; }
+    /* These cells answer to hover and keyboard focus, not to a click, so the
+       cursor should not advertise one. */
+    .mg-cell:not([data-level="0"]) { cursor: default; }
     .mg-cell:hover,
     .mg-cell:focus-visible {
       outline-color: #e5e2e1;
@@ -386,10 +388,11 @@ import RepoSidebar from '../../../components/RepoSidebar.astro';
     }
 
     /* Decision card */
+    /* Not clickable — nothing is wired to these cards, so a pointer cursor
+       only promised a destination that does not exist. */
     .decision-card {
       flex: 1; background: #0e0e0e; border: 1px solid #262626;
       padding: 0; overflow: hidden;
-      cursor: pointer;
     }
     .decision-card:hover { border-color: rgba(204, 0, 0, 0.5); }
 

@@ -237,23 +237,6 @@ import RepoSidebar from '../../components/RepoSidebar.astro';
     .g-link-rejected { stroke: #cc0000; stroke-width: 1; fill: none; stroke-dasharray: 4 3; }
     .g-link-debate   { stroke: #5e3f3a; stroke-width: 1; fill: none; }
 
-    /* Pagination dots */
-    #graph-pagination {
-      position: absolute;
-      bottom: 12px;
-      left: 14px;
-      display: flex;
-      gap: 5px;
-      align-items: center;
-    }
-    .page-dot {
-      width: 8px;
-      height: 8px;
-      background: #262626;
-      cursor: pointer;
-    }
-    .page-dot.active { background: #cc0000; }
-
     /* ══════════════════════════════════════════════════════
        INTELLIGENCE SIDEBAR  — top-right
     ══════════════════════════════════════════════════════ */
@@ -626,11 +609,10 @@ import RepoSidebar from '../../components/RepoSidebar.astro';
             )}
 
             {!IS_UUID && (
-              <div id="graph-pagination" aria-label="Graph layer controls" role="group">
-                <div class="page-dot active" role="button" tabindex="0" aria-label="Layer 1" aria-pressed="true"></div>
-                <div class="page-dot" role="button" tabindex="0" aria-label="Layer 2" aria-pressed="false"></div>
-                <div class="page-dot" role="button" tabindex="0" aria-label="Layer 3" aria-pressed="false"></div>
-              </div>
+              <!-- Three dots labelled "Layer 1/2/3" sat here with role="button"
+                   and tabindex="0" but no handler and no layers behind them.
+                   Announcing buttons to a screen reader that cannot be pressed
+                   is worse than not having them. -->
             )}
 
             <!-- Real status overlay — replaces demo data on failure/empty/pending -->
