@@ -74,7 +74,7 @@ export type StatusResult =
 
 export async function fetchStatusResult(jobId: string): Promise<StatusResult> {
   try {
-    const r = await fetch(`${apiBase()}/api/repo/${jobId}/status`);
+    const r = await apiFetch(`${apiBase()}/api/repo/${jobId}/status`);
     if (r.status === 404) return { kind: 'gone' };
     if (!r.ok) return { kind: 'unreachable' };
     return { kind: 'ok', status: (await r.json()) as RepoStatus };
@@ -176,6 +176,24 @@ export function shortRef(ref: unknown): string {
   const num = text.match(/#?(\d+)/);
   if (num) return '#' + num[1];
   return text.length > 12 ? text.slice(0, 12) + '\u2026' : text;
+}
+
+/** How long any single API call may take before it counts as unreachable. */
+export const API_TIMEOUT_MS = 10000;
+
+/**
+ * fetch() with a deadline.
+ *
+ * A backend that is *down* is not the same as one that *refuses*. Render's
+ * free tier, once its database expired, stopped answering entirely: the
+ * request neither resolved nor rejected, it simply hung. Bare fetch() has no
+ * default timeout, so every poller sat waiting for a reply that was never
+ * coming — the retry counters never advanced, no error was ever surfaced, and
+ * the page showed "SYNCING…" for as long as it stayed open. That is the exact
+ * silent degradation this project treats as its worst failure mode.
+ */
+export function apiFetch(url: string, init: RequestInit = {}): Promise<Response> {
+  return fetch(url, { ...init, signal: AbortSignal.timeout(API_TIMEOUT_MS) });
 }
 
 /** Consecutive unreachable ticks tolerated before the feed gives up. */

@@ -798,7 +798,7 @@ import RepoSidebar from '../../../components/RepoSidebar.astro';
   <script type="application/json" id="glyph-seed" set:html={JSON.stringify({ seedDecisions: decisions })}></script>
 
   <script>
-    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed, shortRef }
+    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed, apiFetch, shortRef }
       from '../../../scripts/repo-view';
     import * as d3 from 'd3';
 
@@ -1117,7 +1117,7 @@ import RepoSidebar from '../../../components/RepoSidebar.astro';
 
       const list = document.getElementById('timeline-list');
 
-      fetch(`${API_BASE}/api/repo/${jobId}/decisions`)
+      apiFetch(`${API_BASE}/api/repo/${jobId}/decisions`)
         .then(r => r.ok ? r.json() : null)
         .then(data => {
           if (!data?.decisions?.length) {
@@ -1205,7 +1205,15 @@ import RepoSidebar from '../../../components/RepoSidebar.astro';
         })
         .catch(() => {
           const body = document.getElementById('stream-body');
-          appendErrorLine(body, 'COULD NOT REACH ANALYSIS SERVICE — showing static preview');
+          // "showing static preview" was untrue — nothing was shown at all, and
+          // the panel below stayed on its SYNCING placeholder for ever. Say
+          // what happened and clear the placeholder.
+          appendErrorLine(body, 'ANALYSIS SERVICE UNREACHABLE — no data loaded');
+          showEmptyState(
+            document.getElementById('timeline-list'),
+            'SERVICE_UNREACHABLE',
+            'The analysis API did not respond. Check the backend is running, then reload.',
+          );
         });
     })();
 

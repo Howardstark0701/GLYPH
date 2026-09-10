@@ -550,7 +550,7 @@ import RepoSidebar from '../../../components/RepoSidebar.astro';
   <script type="application/json" id="glyph-seed" set:html={JSON.stringify({ repoId, rejectionCount: rejections.length })}></script>
 
   <script>
-    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed }
+    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed, apiFetch }
       from '../../../scripts/repo-view';
 
     const seedEl = document.getElementById('glyph-seed');
@@ -583,7 +583,7 @@ import RepoSidebar from '../../../components/RepoSidebar.astro';
       const jobId = getJobId();
       if (!jobId) return; // static seed data is fine for slug-based URLs
 
-      fetch(`${API_BASE}/api/repo/${jobId}/rejections`)
+      apiFetch(`${API_BASE}/api/repo/${jobId}/rejections`)
         .then(r => r.ok ? r.json() : null)
         .then(data => {
           const grid = document.getElementById('card-grid');
@@ -638,7 +638,15 @@ import RepoSidebar from '../../../components/RepoSidebar.astro';
         })
         .catch(() => {
           const body = document.getElementById('terminal-body');
-          appendErrorLine(body, 'COULD NOT REACH ANALYSIS SERVICE — showing static preview');
+          // "showing static preview" was untrue — nothing was shown at all, and
+          // the panel below stayed on its SYNCING placeholder for ever. Say
+          // what happened and clear the placeholder.
+          appendErrorLine(body, 'ANALYSIS SERVICE UNREACHABLE — no data loaded');
+          showEmptyState(
+            document.getElementById('card-grid'),
+            'SERVICE_UNREACHABLE',
+            'The analysis API did not respond. Check the backend is running, then reload.',
+          );
         });
     })();
 

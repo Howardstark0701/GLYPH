@@ -922,7 +922,9 @@ import RepoSidebar from '../../components/RepoSidebar.astro';
 
       async function poll() {
         try {
-          var resp = await fetch(API_BASE + '/api/repo/' + repoId + '/status');
+          // Inline deadline: this block is a plain script and cannot import
+          // apiFetch, but a hanging backend must still become a failure.
+          var resp = await fetch(API_BASE + '/api/repo/' + repoId + '/status', { signal: AbortSignal.timeout(10000) });
           if (resp.status === 404) {
             stopPolling();
             setHeartbeat('NOT_FOUND');
@@ -996,7 +998,7 @@ import RepoSidebar from '../../components/RepoSidebar.astro';
 
           if (status === 'complete') {
             try {
-              var g  = await fetch(API_BASE + '/api/repo/' + repoId + '/graph');
+              var g  = await fetch(API_BASE + '/api/repo/' + repoId + '/graph', { signal: AbortSignal.timeout(10000) });
               var gd = await g.json();
               var n  = (gd.meta && gd.meta.total_nodes) || (gd.nodes && gd.nodes.length) || 0;
               if (n > 0 && n !== lastNodes) {
@@ -1035,7 +1037,7 @@ import RepoSidebar from '../../components/RepoSidebar.astro';
     import * as d3 from 'd3';
     // apiBase() owns the environment fallback. Hardcoding localhost:8000 here
     // made the deployed graph call the visitor's own machine and never render.
-    import { apiBase, shortRef } from '../../scripts/repo-view';
+    import { apiBase, shortRef, apiFetch } from '../../scripts/repo-view';
 
     const API_BASE = apiBase();
 
@@ -1076,7 +1078,7 @@ import RepoSidebar from '../../components/RepoSidebar.astro';
       let status = 'processing';
       let errorMsg = null;
       try {
-        const s = await fetch(`${API_BASE}/api/repo/${jobId}/status`);
+        const s = await apiFetch(`${API_BASE}/api/repo/${jobId}/status`);
         if (s.status === 404) {
           return { kind: 'empty', code: 'NO_JOB', msg: 'No analysis exists for this job id.' };
         }
@@ -1095,7 +1097,7 @@ import RepoSidebar from '../../components/RepoSidebar.astro';
       }
 
       try {
-        const resp = await fetch(`${API_BASE}/api/repo/${jobId}/graph`);
+        const resp = await apiFetch(`${API_BASE}/api/repo/${jobId}/graph`);
         if (!resp.ok) return { kind: 'pending', code: 'LINK_FAIL', msg: 'Graph service did not answer — reload to try again.' };
         const data = await resp.json();
 

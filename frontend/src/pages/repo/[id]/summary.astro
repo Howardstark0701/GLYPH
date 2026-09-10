@@ -643,7 +643,7 @@ import RepoSidebar from '../../../components/RepoSidebar.astro';
   <script type="application/json" id="glyph-seed" set:html={JSON.stringify({ seedSections: sections, repoStats: stats })}></script>
 
   <script>
-    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed }
+    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed, apiFetch }
       from '../../../scripts/repo-view';
 
     const seedEl = document.getElementById('glyph-seed');
@@ -718,7 +718,7 @@ import RepoSidebar from '../../../components/RepoSidebar.astro';
       ];
 
       cells.forEach(([elId, endpoint, key]) => {
-        fetch(`${API_BASE}/api/repo/${jobId}/${endpoint}`)
+        apiFetch(`${API_BASE}/api/repo/${jobId}/${endpoint}`)
           .then(r => r.ok ? r.json() : null)
           .then(data => {
             const el = document.getElementById(elId);
@@ -747,7 +747,7 @@ import RepoSidebar from '../../../components/RepoSidebar.astro';
         return;
       }
 
-      fetch(`${API_BASE}/api/repo/${jobId}/summary`, {
+      apiFetch(`${API_BASE}/api/repo/${jobId}/summary`, {
         headers: { 'X-Nim-Api-Key': nimKey },
       })
         .then(r => r.ok ? r.json() : null)
@@ -814,7 +814,15 @@ import RepoSidebar from '../../../components/RepoSidebar.astro';
         })
         .catch(() => {
           const body = document.getElementById('gen-log-body');
-          appendErrorLine(body, 'COULD NOT REACH ANALYSIS SERVICE — showing static preview');
+          // "showing static preview" was untrue — nothing was shown at all, and
+          // the panel below stayed on its SYNCING placeholder for ever. Say
+          // what happened and clear the placeholder.
+          appendErrorLine(body, 'ANALYSIS SERVICE UNREACHABLE — no data loaded');
+          showEmptyState(
+            document.getElementById('narrative-col'),
+            'SERVICE_UNREACHABLE',
+            'The analysis API did not respond. Check the backend is running, then reload.',
+          );
         });
     })();
 
@@ -838,7 +846,7 @@ import RepoSidebar from '../../../components/RepoSidebar.astro';
         (btn as HTMLButtonElement).disabled = true;
 
         try {
-          const resp = await fetch(`${API_BASE}/api/repo/${jobId}/summary`, {
+          const resp = await apiFetch(`${API_BASE}/api/repo/${jobId}/summary`, {
             headers: { 'X-Nim-Api-Key': nimKey },
           });
           if (resp.ok) {
