@@ -92,6 +92,8 @@ const statusColor = debateThread.status === 'HEATED'
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GLYPH — Debate Explorer — {repoSlug}</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="glyph-repo-slug" content={repoSlug} />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -683,7 +685,9 @@ const statusColor = debateThread.status === 'HEATED'
         <section id="sentiment-panel" aria-labelledby="sentiment-label">
           <div class="panel-header">
             <span class="ph-left" id="sentiment-label">SENTIMENT_SPECTRUM</span>
-            <span class="ph-right">WINDOW: 128H</span>
+            <!-- No 128-hour window exists: the spectrum covers every debate
+                 node in the analysis. The old label was invented. -->
+            <span class="ph-right" id="sentiment-window">WINDOW: ALL_DEBATES</span>
           </div>
           <div id="sentiment-chart-wrap">
             <svg id="sentiment-svg" aria-label="Sentiment activity bar chart" role="img"></svg>
@@ -886,7 +890,12 @@ const statusColor = debateThread.status === 'HEATED'
   <script type="application/json" id="glyph-seed" set:html={JSON.stringify({ sentimentBars, prNumber: debateThread.prNumber, contributors })}></script>
 
   <script>
-    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed } from '../../../scripts/repo-view';
+    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed,
+             hydrateRepoIdentity } from '../../../scripts/repo-view';
+
+    // Name the repository this job analysed — the URL carries only a UUID,
+    // so the server-rendered title reads "unknown/unknown" until this lands.
+    hydrateRepoIdentity();
 
     const seedEl = document.getElementById('glyph-seed');
     const { sentimentBars, prNumber, contributors } =
@@ -953,15 +962,20 @@ const statusColor = debateThread.status === 'HEATED'
           }
 
           const total = debates.length;
-          const confidence = (d: any) => d.confidence ?? 0;
-          const avgConf = Math.round(
-            (debates.reduce((s, d) => s + confidence(d), 0) / total) * 100
+          // A debate the model did not score is unrated, not zero-confidence.
+          // Averaging over every thread put unscored ones on the floor and
+          // counted them as low-confidence in the readout below.
+          const rated = debates.filter(
+            (d: any) => d.confidence !== null && d.confidence !== undefined,
           );
-          const bars = debates.map(d => Math.round(confidence(d) * 100));
+          const avgConf = rated.length
+            ? Math.round((rated.reduce((s, d: any) => s + d.confidence, 0) / rated.length) * 100)
+            : null;
+          const bars = rated.map((d: any) => Math.round(d.confidence * 100));
           const topics = new Set(
             debates.map(d => (d.title ?? '').trim().toLowerCase()).filter(Boolean)
           ).size;
-          const lowConf = debates.filter(d => confidence(d) < 0.5).length;
+          const lowConf = rated.filter((d: any) => d.confidence < 0.5).length;
 
           // Contributor participation across threads.
           const participation = new Map<string, number>();
@@ -987,7 +1001,19 @@ const statusColor = debateThread.status === 'HEATED'
 
           // ── Header stats ──
           setText('hs-total', String(total));
-          setText('hs-conf', `${avgConf}%`);
+          setText('hs-conf', avgConf === null ? '—' : `${avgConf}%`);
+
+          // Name the real window the spectrum covers, rather than a made-up
+          // 128 hours: the span of the debates actually plotted.
+          const dTimes = debates
+            .map((d: any) => Date.parse(d.timestamp ?? ''))
+            .filter((t: number) => !Number.isNaN(t));
+          if (dTimes.length >= 2) {
+            const days = Math.max(1, Math.round((Math.max(...dTimes) - Math.min(...dTimes)) / 86400000));
+            setText('sentiment-window', `WINDOW: ${days}D`);
+          } else {
+            setText('sentiment-window', `WINDOW: ALL_DEBATES`);
+          }
 
           // ── Sentiment / contention metrics ──
           setText('sm-agreement', `${m.agreement_pct ?? 0}%`);
@@ -1084,7 +1110,7 @@ const statusColor = debateThread.status === 'HEATED'
             line.innerHTML =
               `<span class="f-ts">[${nowTs()}]</span> <span style="color:#a1a1a1;">DATA:</span> ` +
               `<span style="color:#e5e2e1;">FOUND ${total} DEBATE THREAD${total === 1 ? '' : 'S'} · ` +
-              `${avgParticipants.toFixed(1)} PARTICIPANTS AVG · ${avgConf}% AVG CONFIDENCE</span>`;
+              `${avgParticipants.toFixed(1)} PARTICIPANTS AVG · ${avgConf === null ? '—' : avgConf + '%'} AVG CONFIDENCE</span>`;
             feed.appendChild(line);
             feed.scrollTop = feed.scrollHeight;
           }

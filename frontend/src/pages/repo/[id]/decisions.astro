@@ -25,6 +25,12 @@ try {
   }
 } catch (_) {}
 
+// A single expression, not `{repoOwner}/{repoName}`: the Astro compiler
+// swallows a `/{expr}` that follows another expression in the page title, so
+// writing the two halves separately rendered "unknown" and dropped the
+// repository name entirely.
+const repoSlug = `${repoOwner}/${repoName}`;
+
 // ── Static seed data (demo/slug URLs only) ────────────────
 interface Decision {
   index:       number;
@@ -93,7 +99,9 @@ const statusColor = (s: Decision['status']) =>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GLYPH — Decision Index — {repoOwner}/{repoName}</title>
+  <title>GLYPH — Decision Index — {repoSlug}</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="glyph-repo-slug" content={repoSlug} />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -565,6 +573,14 @@ const statusColor = (s: Decision['status']) =>
       flex: 1; height: 3px; background: #1a1a1a; position: relative;
     }
     .conf-bar-fill { height: 3px; background: #cc0000; }
+    .conf-unrated-note {
+      display: block;
+      margin-top: 0.4rem;
+      font-size: 0.55rem;
+      letter-spacing: 0.05em;
+      color: #5e3f3a;
+    }
+
     .conf-bar-pct {
       font-family:'JetBrains Mono',monospace; font-size:0.55rem;
       color:#cc0000; width: 28px; text-align:right; flex-shrink:0;
@@ -900,6 +916,7 @@ const statusColor = (s: Decision['status']) =>
                 </div>
               ))}
             </div>
+            <span class="conf-unrated-note" id="conf-unrated-note"></span>
           </div>
 
           <!-- Top decision makers -->
@@ -972,7 +989,12 @@ const statusColor = (s: Decision['status']) =>
   <script type="application/json" id="glyph-seed" set:html={JSON.stringify({ seedDecisions: decisions })}></script>
 
   <script>
-    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed } from '../../../scripts/repo-view';
+    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed,
+             hydrateRepoIdentity } from '../../../scripts/repo-view';
+
+    // Name the repository this job analysed — the URL carries only a UUID,
+    // so the server-rendered title reads "unknown/unknown" until this lands.
+    hydrateRepoIdentity();
     import * as d3 from 'd3';
 
     const seedEl = document.getElementById('glyph-seed');
@@ -993,11 +1015,16 @@ const statusColor = (s: Decision['status']) =>
       const M = { top: 16, right: 14, bottom: 26, left: 34 };
 
       // Confidence is 0–1 from the API but 0–100 in seed data — normalise.
+      // A null confidence means the model never rated that decision. It is
+      // not a zero, and plotting it as one parked real findings on the floor
+      // of the y-axis, so unrated decisions are left off this chart; the
+      // dated list below still carries them.
       const pts = items
         .map((d: any) => {
           const t = d.timestamp ? new Date(d.timestamp) : null;
           if (!t || isNaN(t.getTime())) return null;
-          const raw  = d.confidence ?? 0;
+          const raw  = d.confidence;
+          if (raw === null || raw === undefined) return null;
           const conf = raw > 1 ? Math.round(raw) : Math.round(raw * 100);
           return {
             t, conf,
@@ -1324,14 +1351,23 @@ const statusColor = (s: Decision['status']) =>
             // "PR #1822". Blindly taking the first 7 characters rendered
             // "COMMIT: commit:", so pull out the actual identifier.
             const sha     = shortRef(ref);
-            const conf    = Math.round((d.confidence ?? 0) * 100);
+            // null means the model returned no score for this decision.
+            // Rendering that as 0% asserted near-total doubt about findings
+            // that are often the best-evidenced ones in the set.
+            const rated   = d.confidence !== null && d.confidence !== undefined;
+            const conf    = rated ? Math.round(d.confidence * 100) : null;
             const contrib = Array.isArray(d.contributors) ? d.contributors[0] ?? 'unknown' : 'unknown';
             const ts      = (d.timestamp ?? '').replace('T', ' ').replace('Z', '');
             const padIdx  = String(idx + 1).padStart(2, '0');
 
             // Status derived honestly from confidence, not a hardcoded label.
-            const status = conf >= 90 ? 'STABLE' : conf >= 70 ? 'RESOLVED' : 'CRITICAL';
-            const color  = conf >= 90 ? '#22d3ee' : conf >= 70 ? '#a1a1a1' : '#ef4444';
+            // With no score there is nothing to derive, so say so.
+            const status = !rated ? 'UNRATED'
+                         : conf >= 90 ? 'STABLE'
+                         : conf >= 70 ? 'RESOLVED' : 'CRITICAL';
+            const color  = !rated ? '#5e3f3a'
+                         : conf >= 90 ? '#22d3ee'
+                         : conf >= 70 ? '#a1a1a1' : '#ef4444';
 
             const item = document.createElement('div');
             item.className = 'timeline-item';
@@ -1352,7 +1388,7 @@ const statusColor = (s: Decision['status']) =>
                     <span class="dc-commit-label">COMMIT:</span>
                     <span class="dc-commit-val">${sha}</span>
                     <span class="dc-conf-label">CONFIDENCE:</span>
-                    <span class="dc-conf-val">${conf}%</span>
+                    <span class="dc-conf-val">${rated ? conf + '%' : '—'}</span>
                   </div>
                   <span class="dc-contributor">@${contrib}</span>
                 </div>
@@ -1387,10 +1423,16 @@ const statusColor = (s: Decision['status']) =>
         if (el) el.textContent = val;
       };
 
-      const confs = items.map(d => Math.round((d.confidence ?? 0) * 100));
+      // Only decisions the model actually scored count toward the average
+      // and the histogram. Treating an unscored decision as 0% both invented
+      // a rating and dragged the headline average down.
+      const confs = items
+        .filter(d => d.confidence !== null && d.confidence !== undefined)
+        .map(d => Math.round(d.confidence * 100));
       const avg   = confs.length
         ? Math.round(confs.reduce((a, c) => a + c, 0) / confs.length)
-        : 0;
+        : null;
+      const unrated = items.length - confs.length;
 
       const people = new Set();
       items.forEach(d => {
@@ -1407,7 +1449,7 @@ const statusColor = (s: Decision['status']) =>
         : null;
 
       set('stat-total',    String(items.length));
-      set('stat-conf',     `${avg}%`);
+      set('stat-conf',     avg === null ? '—' : `${avg}%`);
       set('stat-contribs', String(people.size));
       set('stat-span',     spanDays === null ? 'N/A' : `${spanDays} days`);
 
@@ -1421,12 +1463,22 @@ const statusColor = (s: Decision['status']) =>
       buckets.forEach(([label, count]) => {
         const row = document.querySelector(`.conf-bar-row[data-bucket="${label}"]`);
         if (!row) return;
-        const pct = confs.length ? Math.round(count / confs.length * 100) : 0;
         const fill = row.querySelector('.conf-bar-fill');
         const out  = row.querySelector('.conf-bar-pct');
-        if (fill) fill.style.width = pct + '%';
-        if (out)  out.textContent  = pct + '%';
+        // With nothing rated there is no distribution to show — an em-dash
+        // rather than four bars all reading 0%.
+        const pct = confs.length ? Math.round(count / confs.length * 100) : null;
+        if (fill) fill.style.width = (pct ?? 0) + '%';
+        if (out)  out.textContent  = pct === null ? '—' : pct + '%';
       });
+
+      // Say plainly how much of the set the distribution above covers.
+      const note = document.getElementById('conf-unrated-note');
+      if (note) {
+        note.textContent = unrated > 0
+          ? `${unrated} of ${items.length} unrated by the model`
+          : '';
+      }
 
       // Top decision makers — real handles, real counts.
       const tally = {};

@@ -25,6 +25,12 @@ try {
   }
 } catch (_) {}
 
+// A single expression, not `{repoOwner}/{repoName}`: the Astro compiler
+// swallows a `/{expr}` that follows another expression in the page title, so
+// writing the two halves separately rendered "unknown" and dropped the
+// repository name entirely.
+const repoSlug = `${repoOwner}/${repoName}`;
+
 // ── Static seed (replaced by GET /repo/:id/contributors) ──
 interface Contributor {
   handle:      string;
@@ -125,7 +131,9 @@ const initials = (h: string) =>
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GLYPH — Contributors — {repoOwner}/{repoName}</title>
+  <title>GLYPH — Contributors — {repoSlug}</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="glyph-repo-slug" content={repoSlug} />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -862,7 +870,12 @@ const initials = (h: string) =>
   <script type="application/json" id="glyph-seed" set:html={JSON.stringify({ seedContributors: contributors })}></script>
 
   <script>
-    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed } from '../../../scripts/repo-view';
+    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed,
+             hydrateRepoIdentity } from '../../../scripts/repo-view';
+
+    // Name the repository this job analysed — the URL carries only a UUID,
+    // so the server-rendered title reads "unknown/unknown" until this lands.
+    hydrateRepoIdentity();
 
     const seedEl = document.getElementById('glyph-seed');
     const { seedContributors } = JSON.parse(seedEl?.textContent || '{"seedContributors":[]}');
@@ -895,7 +908,11 @@ const initials = (h: string) =>
             const total      = c.total_nodes ?? (decisions + debates + rejections);
             const influence  = Math.max(1, Math.round((total / maxNodes) * 100));
             const rejectionRate = total > 0 ? rejections / total : 0;
-            const confidence = Math.round(c.avg_confidence ?? 0);
+            // null when none of this contributor's nodes carried a model
+            // score. Saying "0% mean confidence" about them would be an
+            // invented reading of the data, so the clause is dropped instead.
+            const rated      = c.avg_confidence !== null && c.avg_confidence !== undefined;
+            const confidence = rated ? Math.round(c.avg_confidence) : null;
 
             const role = rejectionRate > 0.4
               ? 'REVIEWER / GATEKEEPER'
@@ -915,7 +932,7 @@ const initials = (h: string) =>
               ? `Rejection-heavy profile — blocks proposals that lack evidence. ${rejections} proposals vetoed across ${debates} debate threads.`
               : debates > decisions
                 ? `Consensus-builder — active in ${debates} debate threads, authors ${decisions} decisions. Pressures proposals through review.`
-                : `Primary decision author — owns ${decisions} decisions directly. ${rejections} proposals rejected. Signals at ${confidence}% mean confidence.`;
+                : `Primary decision author — owns ${decisions} decisions directly. ${rejections} proposals rejected.${rated ? ` Signals at ${confidence}% mean confidence.` : ''}`;
 
             return {
               handle: c.handle, decisions, debates, rejections, influence, confidence, role, pattern, reasoning,

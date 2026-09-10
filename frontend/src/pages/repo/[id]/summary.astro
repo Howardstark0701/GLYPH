@@ -94,6 +94,8 @@ const stats = { decisions: 12, debates: 7, rejections: 5 };
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GLYPH — Intelligence Summary — {repoSlug}</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="glyph-repo-slug" content={repoSlug} />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -647,7 +649,7 @@ const stats = { decisions: 12, debates: 7, rejections: 5 };
         <div class="breadcrumb-row">
           <span class="bc-report">INTELLIGENCE_REPORT</span>
           <span class="bc-sep">/</span>
-          <span class="bc-repo">{repoSlug}</span>
+          <span class="bc-repo" data-repo-slug>{repoSlug}</span>
         </div>
         <h1 class="page-title">REPOSITORY INTELLIGENCE SUMMARY</h1>
       </header>
@@ -819,7 +821,12 @@ const stats = { decisions: 12, debates: 7, rejections: 5 };
   <script type="application/json" id="glyph-seed" set:html={JSON.stringify({ seedSections: sections, repoStats: stats })}></script>
 
   <script>
-    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed } from '../../../scripts/repo-view';
+    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed,
+             hydrateRepoIdentity } from '../../../scripts/repo-view';
+
+    // Name the repository this job analysed — the URL carries only a UUID,
+    // so the server-rendered title reads "unknown/unknown" until this lands.
+    hydrateRepoIdentity();
 
     const seedEl = document.getElementById('glyph-seed');
     const { seedSections, repoStats } = JSON.parse(seedEl?.textContent || '{"seedSections":[],"repoStats":{}}');

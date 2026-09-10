@@ -11,6 +11,7 @@ import '../styles/global.css';
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GLYPH_OS — v4.0.2-STABLE</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
   <!-- global.css imported via Astro frontmatter import, not a static link -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -802,7 +803,11 @@ import '../styles/global.css';
   ════════════════════════════════════════════════════════════ -->
   <aside id="sidebar-strip" aria-label="Station identification">
     <span class="sidebar-text">STATION_ID: GLYPH-PRIME-04</span>
-    <span class="sidebar-text">ENCRYPTION: AES_256_GCM</span>
+    <!-- Was "ENCRYPTION: AES_256_GCM", which GLYPH does not do: it holds no
+         data at rest to encrypt and adds no cipher of its own beyond the
+         transport. The BYOK guarantee is the real claim, and it is stronger
+         than the invented one. -->
+    <span class="sidebar-text">KEYS: NEVER_STORED</span>
   </aside>
 
   <!-- ═══════════════════════════════════════════════════════

@@ -14,6 +14,10 @@ export interface RepoStatus {
   stage:         string | null;
   error_message: string | null;
   analyzed_at:   string | null;
+  /** Which repository this job analysed. The URL only carries the job id. */
+  owner?:        string | null;
+  name?:         string | null;
+  github_url?:   string | null;
 }
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -52,14 +56,36 @@ export function nowTs(): string {
   return `[${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}]`;
 }
 
-export async function fetchStatus(jobId: string): Promise<RepoStatus | null> {
+/**
+ * Why this is a tagged result rather than `RepoStatus | null`:
+ *
+ * Callers poll this on an interval, and the two ways it can fail need
+ * opposite handling. A 404 means the job id does not exist — retrying can
+ * never succeed, so the poller must stop and say so. A network error or a
+ * 5xx may well clear on the next tick, so the poller should retry, but only
+ * a bounded number of times. Collapsing both into `null` produced a loop
+ * that hammered a dead endpoint every 3s for the life of the tab while
+ * showing the viewer nothing at all.
+ */
+export type StatusResult =
+  | { kind: 'ok'; status: RepoStatus }
+  | { kind: 'gone' }
+  | { kind: 'unreachable' };
+
+export async function fetchStatusResult(jobId: string): Promise<StatusResult> {
   try {
     const r = await fetch(`${apiBase()}/api/repo/${jobId}/status`);
-    if (!r.ok) return null;
-    return (await r.json()) as RepoStatus;
+    if (r.status === 404) return { kind: 'gone' };
+    if (!r.ok) return { kind: 'unreachable' };
+    return { kind: 'ok', status: (await r.json()) as RepoStatus };
   } catch {
-    return null;
+    return { kind: 'unreachable' };
   }
+}
+
+export async function fetchStatus(jobId: string): Promise<RepoStatus | null> {
+  const r = await fetchStatusResult(jobId);
+  return r.kind === 'ok' ? r.status : null;
 }
 
 const STAGE_LABEL: Record<string, string> = {
@@ -92,8 +118,57 @@ export function statusLineHtml(s: RepoStatus): string {
 }
 
 /**
+ * Fill in which repository this job actually analysed.
+ *
+ * The URL of a real job carries only its UUID, so the server-rendered pages
+ * fall back to "unknown/unknown" in their titles and headers — a dashboard
+ * that cannot name the repository it just analysed reads as broken. GET
+ * /status now returns owner/name, so one call fixes every such spot.
+ *
+ * Rewrites the document title and the text of any [data-repo-slug] and
+ * [data-repo-context] element. No-op in demo (slug) mode, where the URL
+ * already names the repository.
+ */
+export async function hydrateRepoIdentity(): Promise<void> {
+  const jobId = getJobId();
+  if (!jobId) return;
+
+  const res = await fetchStatusResult(jobId);
+  if (res.kind !== 'ok') return;
+
+  const owner = res.status.owner;
+  const name  = res.status.name;
+  if (!owner || !name) return;
+
+  const slug = `${owner}/${name}`;
+
+  // Replace exactly what the server rendered. The placeholder is not a fixed
+  // string — it is "unknown/<job-uuid>" — so each page publishes the slug it
+  // rendered in <meta name="glyph-repo-slug">, and that is what gets swapped.
+  const seeded = document
+    .querySelector('meta[name="glyph-repo-slug"]')
+    ?.getAttribute('content');
+  if (seeded && document.title.includes(seeded)) {
+    document.title = document.title.replace(seeded, slug);
+  }
+
+  document.querySelectorAll('[data-repo-slug]').forEach((el) => {
+    el.textContent = slug;
+  });
+  document.querySelectorAll('[data-repo-context]').forEach((el) => {
+    el.textContent = `THREAD CONTEXT: ${owner}_${name}_ANALYSIS`.toUpperCase();
+  });
+}
+
+/** Consecutive unreachable ticks tolerated before the feed gives up. */
+const MAX_STATUS_FAILURES = 5;
+
+/**
  * Poll the real status endpoint and append honest lines to a feed
- * container. Stops when the analysis reaches a terminal state.
+ * container. Stops when the analysis reaches a terminal state, when the job
+ * turns out not to exist, or after MAX_STATUS_FAILURES consecutive failures
+ * to reach the backend — and says which of those happened rather than
+ * leaving an empty stream behind.
  * Returns a cancel function. No-op in demo (slug) mode.
  */
 export function startStatusFeed(
@@ -125,9 +200,43 @@ export function startStatusFeed(
     }
   };
 
+  const stop = () => {
+    if (timer) window.clearInterval(timer);
+    timer = undefined;
+  };
+
+  const appendFailure = (msg: string) => {
+    append(
+      `<span style="color:#5e3f3a;">${nowTs()}</span> ` +
+      `<span style="color:#cc0000;font-weight:700;">[ERROR]</span> ` +
+      `<span style="color:#cc0000;">${msg}</span>`,
+    );
+  };
+
+  let failures = 0;
+
   const poll = async () => {
-    const s = await fetchStatus(jobId);
-    if (!s) return;
+    const res = await fetchStatusResult(jobId);
+
+    if (res.kind === 'gone') {
+      stop();
+      appendFailure('STATUS_UNAVAILABLE — no analysis exists for this job id');
+      return;
+    }
+
+    if (res.kind === 'unreachable') {
+      failures += 1;
+      if (failures >= MAX_STATUS_FAILURES) {
+        stop();
+        appendFailure(
+          `STATUS_UNREACHABLE — backend did not answer ${MAX_STATUS_FAILURES} times; polling stopped`,
+        );
+      }
+      return;
+    }
+
+    failures = 0;
+    const s = res.status;
 
     const sig = `${s.status}::${s.stage ?? ''}`;
     if (terminalSeen || sig === lastSig) return;
@@ -136,7 +245,7 @@ export function startStatusFeed(
       terminalSeen = true;
       lastSig = sig;
       append(render(s));
-      if (timer) window.clearInterval(timer);
+      stop();
       return;
     }
 

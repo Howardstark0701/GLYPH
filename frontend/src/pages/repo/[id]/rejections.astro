@@ -62,6 +62,8 @@ const padIdx = (n: number) => String(n).padStart(3, '0');
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GLYPH — Rejection Vault — {repoSlug}</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="glyph-repo-slug" content={repoSlug} />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -754,7 +756,12 @@ const padIdx = (n: number) => String(n).padStart(3, '0');
   <script type="application/json" id="glyph-seed" set:html={JSON.stringify({ repoId, rejectionCount: rejections.length })}></script>
 
   <script>
-    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed } from '../../../scripts/repo-view';
+    import { getJobId, apiBase, showEmptyState, appendErrorLine, startStatusFeed,
+             hydrateRepoIdentity } from '../../../scripts/repo-view';
+
+    // Name the repository this job analysed — the URL carries only a UUID,
+    // so the server-rendered title reads "unknown/unknown" until this lands.
+    hydrateRepoIdentity();
 
     const seedEl = document.getElementById('glyph-seed');
     const { repoId, rejectionCount } = JSON.parse(seedEl?.textContent || '{"repoId":"","rejectionCount":0}');

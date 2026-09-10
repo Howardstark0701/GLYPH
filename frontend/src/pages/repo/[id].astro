@@ -37,6 +37,8 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>GLYPH — {repoSlug}</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <meta name="glyph-repo-slug" content={repoSlug} />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Karla:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -876,7 +878,7 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
                poller below). Hardcoding "ACTIVE" made a failed job's header
                contradict its own STATUS: FAILED readout. -->
           <h1 class="page-title">SYSTEM RECONSTRUCTION: <span id="recon-state" style="color:#cc0000;">{IS_UUID ? 'CONNECTING' : 'ACTIVE'}</span></h1>
-          <p class="page-context">THREAD CONTEXT: {repoContext}</p>
+          <p class="page-context" data-repo-context>THREAD CONTEXT: {repoContext}</p>
         </div>
         <div id="page-header-right">
           <span class="uptime">UPTIME: <span id="uptime-val">00:00:00:00</span></span>
@@ -1107,6 +1109,13 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
           hbToggle = !hbToggle;
           hb.textContent = hbToggle ? 'HEARTBEAT_STABLE' : 'HEARTBEAT_OK';
         }, 2000);
+      } else {
+        // The seeded HEARTBEAT_STABLE is demo copy. On a real job it must not
+        // stand as an assertion about a backend we have not heard from yet —
+        // and it used to survive for ever when /status 404'd or the backend
+        // was down. Say we are asking; the poller replaces this with the
+        // real status, or with why it could not get one.
+        hb.textContent = 'QUERYING';
       }
     })();
 
@@ -1337,7 +1346,9 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
             md.push('');
             decisions.decisions.forEach(function (d) {
               md.push('- **' + (d.title || 'UNTITLED') + '** — ' + (d.summary || '') +
-                ' (confidence ' + Math.round((d.confidence || 0) * 100) + '%)');
+                (d.confidence === null || d.confidence === undefined
+                  ? ' (confidence not rated)'
+                  : ' (confidence ' + Math.round(d.confidence * 100) + '%)'));
             });
             md.push('');
           }
@@ -1363,7 +1374,10 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
             md.push('');
             contributors.contributors.forEach(function (c) {
               md.push('- @' + c.handle + ' — ' + c.decisions + ' decisions, ' + c.debates +
-                ' debates, ' + c.rejections + ' rejections (avg confidence ' + (c.avg_confidence || 0) + '%)');
+                ' debates, ' + c.rejections + ' rejections' +
+                (c.avg_confidence === null || c.avg_confidence === undefined
+                  ? ''
+                  : ' (avg confidence ' + c.avg_confidence + '%)'));
             });
             md.push('');
           }
@@ -1448,13 +1462,64 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
       var lastStage  = null;
       var lastNodes  = null;
 
+      // Polling has to end. A 404 means this job id does not exist, so no
+      // number of retries will help; a network error may clear, but only a
+      // bounded number of attempts is worth making. Without these the page
+      // hit /status every 3s for the life of the tab — silently, since the
+      // old code returned on failure without telling the viewer anything.
+      var pollTimer  = null;
+      var failures   = 0;
+      var MAX_FAILURES = 5;
+
+      function stopPolling() {
+        if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
+      }
+
+      function setHeartbeat(text) {
+        var hb = document.getElementById('heartbeat-val');
+        if (hb) hb.textContent = text;
+      }
+
+      var TERMINAL = { complete: 1, idle: 1, failed: 1, terminated: 1 };
+
       async function poll() {
         try {
           var resp = await fetch(API_BASE + '/api/repo/' + repoId + '/status');
-          if (!resp.ok) return;
+          if (resp.status === 404) {
+            stopPolling();
+            setHeartbeat('NOT_FOUND');
+            appendLine('critical', 'Status unavailable — no analysis found for job <span class="ev-kw">' + repoId.slice(0, 8) + '</span>');
+            return;
+          }
+          if (!resp.ok) {
+            failures += 1;
+            if (failures >= MAX_FAILURES) {
+              stopPolling();
+              setHeartbeat('UNREACHABLE');
+              appendLine('critical', 'Backend returned no usable status ' + MAX_FAILURES + ' times — polling stopped');
+            }
+            return;
+          }
+          failures = 0;
           var data = await resp.json();
           var status = data.status || 'unknown';
           var stage  = data.stage  || '';
+
+          // Name the repository. The URL is a bare UUID, so the header and
+          // document title render "unknown/unknown" until /status tells us
+          // which repository the job actually analysed.
+          if (data.owner && data.name) {
+            var slug = data.owner + '/' + data.name;
+            var seededMeta = document.querySelector('meta[name="glyph-repo-slug"]');
+            var seeded = seededMeta && seededMeta.getAttribute('content');
+            if (seeded && document.title.indexOf(seeded) !== -1) {
+              document.title = document.title.replace(seeded, slug);
+            }
+            document.querySelectorAll('[data-repo-context]').forEach(function (el) {
+              el.textContent =
+                ('THREAD CONTEXT: ' + data.owner + '_' + data.name + '_ANALYSIS').toUpperCase();
+            });
+          }
 
           var hb = document.getElementById('heartbeat-val');
           if (hb) hb.textContent = status.toUpperCase();
@@ -1508,13 +1573,26 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
               }
             } catch (_) {}
           }
+
+          // Terminal state: nothing further will change, so stop rather than
+          // re-fetch /status (and /graph) every 3s for as long as the tab
+          // stays open.
+          if (TERMINAL[status]) stopPolling();
         } catch (_) {
-          // Backend unreachable — stay quiet rather than spam the log.
+          // Backend unreachable. Retry a few times — a cold start or a
+          // dropped wifi frame recovers — then say so and stop. Staying
+          // quiet here is what made a dead backend look like a slow one.
+          failures += 1;
+          if (failures >= MAX_FAILURES) {
+            stopPolling();
+            setHeartbeat('UNREACHABLE');
+            appendLine('critical', 'Backend unreachable — status polling stopped after ' + MAX_FAILURES + ' attempts');
+          }
         }
       }
 
       poll();
-      setInterval(poll, 3000);
+      pollTimer = setInterval(poll, 3000);
     })();
   </script>
 
@@ -1567,6 +1645,9 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
       let errorMsg = null;
       try {
         const s = await fetch(`${API_BASE}/api/repo/${jobId}/status`);
+        if (s.status === 404) {
+          return { kind: 'empty', code: 'NO_JOB', msg: 'No analysis exists for this job id.' };
+        }
         if (s.ok) {
           const sd = await s.json();
           status   = sd.status ?? 'processing';
@@ -1583,7 +1664,7 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
 
       try {
         const resp = await fetch(`${API_BASE}/api/repo/${jobId}/graph`);
-        if (!resp.ok) return { kind: 'pending', code: 'LINK_FAIL', msg: 'Graph service unreachable — retrying…' };
+        if (!resp.ok) return { kind: 'pending', code: 'LINK_FAIL', msg: 'Graph service did not answer — reload to try again.' };
         const data = await resp.json();
 
         const nodes = (data.nodes ?? []).map((n) => ({
@@ -1631,23 +1712,14 @@ const repoContext = `${repoOwner}_${repoName}_ANALYSIS`.toUpperCase();
         }
         return { kind: 'data', nodes, links };
       } catch {
-        return { kind: 'pending', code: 'SYNCING', msg: 'Synchronizing decision graph…' };
+        return { kind: 'pending', code: 'LINK_FAIL', msg: 'Decision graph could not be loaded — reload to try again.' };
       }
     }
 
-    // ── Poll status → heartbeat display ──────────────────
-    async function pollStatus() {
-      if (!uuidRe.test(jobId)) return;
-      try {
-        const resp = await fetch(`${API_BASE}/api/repo/${jobId}/status`);
-        if (!resp.ok) return;
-        const data = await resp.json();
-        const hb   = document.getElementById('heartbeat-val');
-        if (hb) hb.textContent = (data.status ?? 'UNKNOWN').toUpperCase();
-      } catch (_) { /* ignore */ }
-    }
-    pollStatus();
-    setInterval(pollStatus, 5000);
+    // The heartbeat readout is owned by the recon stream's poller above,
+    // which already writes #heartbeat-val on every tick. A second 5s loop
+    // against the same endpoint lived here and wrote the same element — two
+    // unbounded polls per open dashboard, for one value.
 
     // ── Render ────────────────────────────────────────────
     const result = await loadGraph();
