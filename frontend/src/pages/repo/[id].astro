@@ -213,6 +213,37 @@ import RepoSidebar from '../../components/RepoSidebar.astro';
       background-size: 18px 18px;
     }
     #graph-svg { width: 100%; height: 100%; display: block; }
+    /* The force layout regularly pushes nodes past the panel edge, and on a
+       33-node graph the whole map never fits at once. These drive the pan and
+       zoom that make the rest reachable. */
+    #graph-zoom-controls {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: 12px;
+      vertical-align: middle;
+    }
+    #graph-zoom-controls button {
+      background: transparent;
+      border: 1px solid #262626;
+      color: #a1a1a1;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.6rem;
+      line-height: 1;
+      padding: 3px 6px;
+      cursor: pointer;
+      min-width: 20px;
+    }
+    #graph-zoom-controls button:hover { color: #e5e2e1; border-color: #3a3a3a; }
+    #graph-zoom-level {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.55rem;
+      color: #5e3f3a;
+      min-width: 32px;
+      text-align: center;
+    }
+    #graph-container { cursor: grab; }
+    #graph-container.is-panning { cursor: grabbing; }
 
     /* D3 node rects */
     .g-node rect {
@@ -580,6 +611,12 @@ import RepoSidebar from '../../components/RepoSidebar.astro';
             </span>
             <span class="panel-header-right" id="graph-stats">
               NODES: <span id="node-count">0</span>&nbsp;&nbsp;DENSITY: <span id="graph-density">0</span>%
+              <span id="graph-zoom-controls" role="group" aria-label="Graph zoom controls">
+                <button type="button" id="graph-zoom-out" aria-label="Zoom out">&minus;</button>
+                <span id="graph-zoom-level" aria-live="polite">100%</span>
+                <button type="button" id="graph-zoom-in" aria-label="Zoom in">+</button>
+                <button type="button" id="graph-zoom-fit" aria-label="Fit the whole graph in view">FIT</button>
+              </span>
             </span>
           </div>
           <div id="graph-container" role="img" aria-label="Interactive decision graph">
@@ -1173,19 +1210,25 @@ import RepoSidebar from '../../components/RepoSidebar.astro';
         .force('y',       d3.forceY(H / 2).strength(0.04))
         .force('collide', d3.forceCollide(70));
 
-      const linkGroup = svg.append('g');
+      // Everything the simulation draws goes inside one <g>, so a single
+      // transform on that layer pans and zooms the whole graph.
+      const viewport = svg.append('g').attr('class', 'g-viewport');
+
+      const linkGroup = viewport.append('g');
       const linkEl = linkGroup.selectAll('line')
         .data(links).enter().append('line')
         .attr('class', d =>
           d.type === 'decision' ? 'g-link-decision' :
           d.type === 'rejected' ? 'g-link-rejected' : 'g-link-debate');
 
-      const nodeGroup = svg.append('g');
+      const nodeGroup = viewport.append('g');
       const nodeEl = nodeGroup.selectAll('g')
         .data(nodes).enter().append('g').attr('class', 'g-node')
         .call(
           d3.drag()
-            .on('start', (ev, d) => { if (!ev.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+            // Without this the same gesture would drag the node *and* pan the
+            // canvas underneath it.
+            .on('start', (ev, d) => { ev.sourceEvent?.stopPropagation(); if (!ev.active) simulation.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
             .on('drag',  (ev, d) => { d.fx = ev.x; d.fy = ev.y; })
             .on('end',   (ev, d) => { if (!ev.active) simulation.alphaTarget(0); d.fx = null; d.fy = null; })
         );
@@ -1247,6 +1290,68 @@ import RepoSidebar from '../../components/RepoSidebar.astro';
           .attr('y2', d => (d.target.y ?? 0));
         nodeEl.attr('transform', d => `translate(${d.x ?? 0},${d.y ?? 0})`);
       });
+
+      // ── Pan + zoom ──────────────────────────────────────
+      const MIN_SCALE = 0.15;
+      const MAX_SCALE = 4;
+      const levelEl = document.getElementById('graph-zoom-level');
+
+      const zoom = d3.zoom()
+        .scaleExtent([MIN_SCALE, MAX_SCALE])
+        .on('start', () => contEl?.classList.add('is-panning'))
+        .on('zoom', (ev) => {
+          viewport.attr('transform', ev.transform);
+          if (levelEl) levelEl.textContent = `${Math.round(ev.transform.k * 100)}%`;
+        })
+        .on('end', () => contEl?.classList.remove('is-panning'));
+
+      svg.call(zoom);
+      // Double-click zooms by default, which fights the click-to-inspect
+      // reflex on a node; the FIT button is the deliberate way back.
+      svg.on('dblclick.zoom', null);
+
+      /**
+       * Frame the whole graph.
+       *
+       * The force layout is free to push nodes well outside the panel — on a
+       * 33-node graph a good third of it started off-canvas with no way to
+       * reach it. Measure what was actually laid out and scale to fit, with a
+       * margin so nothing touches the edge.
+       */
+      function fitToView(duration = 400) {
+        if (!nodes.length) return;
+        const xs = nodes.map(n => n.x ?? 0);
+        const ys = nodes.map(n => n.y ?? 0);
+        const minX = Math.min(...xs) - NODE_W / 2;
+        const maxX = Math.max(...xs) + NODE_W / 2;
+        const minY = Math.min(...ys) - NODE_H / 2;
+        const maxY = Math.max(...ys) + NODE_H / 2;
+
+        const gW = Math.max(maxX - minX, 1);
+        const gH = Math.max(maxY - minY, 1);
+        const margin = 24;
+
+        const k = Math.min(
+          MAX_SCALE,
+          Math.max(MIN_SCALE, Math.min((W - margin * 2) / gW, (H - margin * 2) / gH)),
+        );
+        const tx = (W - k * (minX + maxX)) / 2;
+        const ty = (H - k * (minY + maxY)) / 2;
+
+        svg.transition().duration(duration)
+          .call(zoom.transform, d3.zoomIdentity.translate(tx, ty).scale(k));
+      }
+
+      document.getElementById('graph-zoom-in')
+        ?.addEventListener('click', () => svg.transition().duration(200).call(zoom.scaleBy, 1.3));
+      document.getElementById('graph-zoom-out')
+        ?.addEventListener('click', () => svg.transition().duration(200).call(zoom.scaleBy, 1 / 1.3));
+      document.getElementById('graph-zoom-fit')
+        ?.addEventListener('click', () => fitToView());
+
+      // Frame it once the layout has settled rather than mid-scatter.
+      simulation.on('end', () => fitToView(600));
+      setTimeout(() => fitToView(600), 1800);
     }
   </script>
 
