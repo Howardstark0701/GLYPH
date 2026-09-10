@@ -4,8 +4,13 @@
 
 GLYPH is an open-source intelligence backend that takes a GitHub repository URL and reconstructs the **decision history** of that codebase — what was debated, what was rejected, what architectural choices were made and why.
 
+**Live demo:** <https://glyph-flax-two.vercel.app>  
 **Stack:** Rust, Axum, PostgreSQL, NVIDIA NIM, Astro.js, D3.js  
 **Deployment:** Render (backend), Vercel (frontend), or entirely local via Docker Compose
+
+The hosted backend runs on a free tier and sleeps when idle, so the first
+request after a quiet period takes about fifty seconds to wake it. Everything
+after that is fast. Running locally with Docker Compose avoids the wait.
 
 ## Run it
 
