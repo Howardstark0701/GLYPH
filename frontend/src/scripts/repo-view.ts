@@ -236,7 +236,15 @@ export function startStatusFeed(
     }
   };
 
+  // Clearing the interval is not enough to stop this loop. Each poll is async
+  // and, against an unreachable backend, takes the full 10s deadline to
+  // reject — so by the time the fifth failure fires, several more polls are
+  // already in flight. They resolve afterwards, walk the same branch, and
+  // append the same "polling stopped" line again every few seconds. The flag
+  // makes stopping final: nothing is reported once the loop has given up.
+  let stopped = false;
   const stop = () => {
+    stopped = true;
     if (timer) window.clearInterval(timer);
     timer = undefined;
   };
@@ -252,7 +260,9 @@ export function startStatusFeed(
   let failures = 0;
 
   const poll = async () => {
+    if (stopped) return;
     const res = await fetchStatusResult(jobId);
+    if (stopped) return;
 
     if (res.kind === 'gone') {
       stop();
