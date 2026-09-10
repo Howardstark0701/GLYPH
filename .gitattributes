@@ -1,0 +1,20 @@
+# Line endings.
+#
+# This repository is developed on Windows and built on Linux (Render for the
+# backend image, Vercel for the frontend). Without this, git warns on almost
+# every commit that "LF will be replaced by CRLF", and files committed from
+# different machines produce diffs that are entirely line-ending noise.
+#
+# `text=auto` lets git decide what is text, store it with LF, and check it out
+# with the platform's native ending.
+* text=auto
+
+# Binaries git must never try to normalise.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mp4 binary
+*.woff binary
+*.woff2 binary
