@@ -5,7 +5,20 @@
 GLYPH is an open-source intelligence backend that takes a GitHub repository URL and reconstructs the **decision history** of that codebase — what was debated, what was rejected, what architectural choices were made and why.
 
 **Stack:** Rust, Axum, PostgreSQL, NVIDIA NIM, Astro.js, D3.js  
-**Deployment:** Render (backend + PostgreSQL), Vercel (frontend)
+**Deployment:** Render (backend), Vercel (frontend), or entirely local via Docker Compose
+
+## Run it
+
+```bash
+docker compose up --build       # database + backend on :8000
+cd frontend && npm run dev      # UI on :4321
+```
+
+Then open http://localhost:4321, click **KEYS: NOT_SET** to enter your GitHub
+PAT and NVIDIA NIM key, and paste a repository URL.
+
+See [RUNBOOK.md](./RUNBOOK.md) for the full demo procedure, configuration
+reference, and the failure modes this project has actually hit.
 
 ## Features
 

@@ -1,0 +1,52 @@
+# GLYPH — local demo stack.
+#
+#   docker compose up --build
+#
+# Brings up PostgreSQL and the Rust backend on http://localhost:8000.
+# The frontend runs separately (`cd frontend && npm run dev`) so you can edit
+# UI without rebuilding a container.
+#
+# This exists because the hosted backend depends on a free-tier database that
+# expires; a laptop-local stack is the demo path that cannot be taken away by
+# someone else's quota or a venue's wifi.
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: glyph-db
+    environment:
+      POSTGRES_USER:     glyph
+      POSTGRES_PASSWORD: glyph
+      POSTGRES_DB:       glyph
+    ports:
+      # 55432 on the host so it cannot collide with a local PostgreSQL install.
+      - "55432:5432"
+    volumes:
+      - glyph-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U glyph -d glyph"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: glyph-api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://glyph:glyph@db:5432/glyph
+      PORT: "8000"
+      RUST_LOG: "glyph=info,tower_http=info"
+      # Leave FRONTEND_URLS unset locally: with no origin configured the
+      # backend allows any origin, which is safe here because GLYPH holds no
+      # cookies or sessions (BYOK keys travel per-request and are never stored).
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+
+volumes:
+  glyph-pgdata:
